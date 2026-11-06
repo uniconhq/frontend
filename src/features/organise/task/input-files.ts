@@ -7,7 +7,7 @@ import { filesUnder, type PlannedChange, type Source } from './staged';
 /**
  * A file or a folder chosen for a setting of the task on the Inputs card
  * (M51), waiting for the one save of the task: the files written under the
- * input's own folder (`ownFolder`), and what the setting then names; the
+ * input's own folder, named as its id, and what the setting then names; the
  * file or files it named before, when they were under that folder too, are
  * taken out, so a replaced checker leaves nothing behind. Files elsewhere in
  * the task are left as they are.
@@ -22,23 +22,6 @@ export type StagedInput = {
   /** The files chosen, in words: "checker.py, 2 KB" or "3 files, 12 KB". */
   summary: string;
 };
-
-/**
- * The folders of a task the format gives a meaning of its own (TASK-FORMAT
- * 1.2), which the forge refuses as an input's id when a workflow version is
- * made or checked.
- */
-const RESERVED_FOLDERS = new Set(['tests', 'public', 'plans']);
-
-/**
- * The folder a setting's own files go in: `<input>/`, or `inputs/<input>/`
- * for an input of a version made before the forge refused an id that is a
- * reserved folder, so its files never mix with the tests, the files every
- * contestant is served, or the plan.
- */
-function ownFolder(id: string): string {
-  return RESERVED_FOLDERS.has(id) ? `inputs/${id}` : id;
-}
 
 /** A file chosen on the disk as a source of the save. */
 function sourceOf(file: File): Source {
@@ -79,8 +62,7 @@ export async function stageInputFiles(
   files: File[],
   was: string,
 ): Promise<StagedInput> {
-  const id = declared.id;
-  const home = ownFolder(id);
+  const home = declared.id;
   const folder = declared.type === 'folder';
   const chosen = files.map((file) => ({
     path: `${home}/${folder ? insideFolder(file) : file.name}`,
@@ -104,7 +86,7 @@ export async function stageInputFiles(
   }
   const size = files.reduce((sum, file) => sum + file.size, 0);
   return {
-    id,
+    id: declared.id,
     value,
     was,
     planned,
@@ -121,7 +103,7 @@ export async function stageInputFiles(
  * setting takes no single upload.
  */
 export function uploadFits(declared: DeclaredInput, path: string): boolean {
-  const home = `${ownFolder(declared.id)}/`;
+  const home = `${declared.id}/`;
   const name = path.startsWith(home) ? path.slice(home.length) : '';
   return declared.type === 'file' && name !== '' && !name.includes('/');
 }
@@ -138,7 +120,7 @@ export async function stageStoredUpload(
   upload: { id: string; path: string; size: number },
   was: string,
 ): Promise<StagedInput> {
-  const before = await ownBefore(place, ownFolder(declared.id), was);
+  const before = await ownBefore(place, declared.id, was);
   const known = before.find((old) => old.path === upload.path);
   const planned: PlannedChange[] = [
     {

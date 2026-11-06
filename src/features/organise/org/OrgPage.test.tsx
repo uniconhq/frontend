@@ -196,7 +196,6 @@ describe("the org's display name and description", () => {
     expect(name).toHaveFocus();
     expect(name).toHaveValue('Acme Contests');
     const description = within(form).getByRole('textbox', { name: /^Description/ });
-    expect(description).toHaveAttribute('maxlength', '255');
     await user.clear(name);
     await user.type(name, '  Acme Cup ');
     await user.clear(description);

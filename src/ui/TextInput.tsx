@@ -9,7 +9,7 @@ import { useFieldLabel } from './FieldLabel';
  * typing goes in `description`, a short line under the box. Hints sit under
  * the box, as the theme puts them for every field, so fields side by side
  * start their boxes on one line. `info` is background behind an ⓘ beside the
- * label. `maxLength`, when given, is the most characters the field takes.
+ * label.
  * `inputMode="decimal"` asks a phone for its number keys, for a field that
  * takes a number. `ref` is the input itself, for moving the focus to it.
  * `error`, when given, is what the server refused about the field: it reads
@@ -29,7 +29,6 @@ export function TextInput({
   info,
   error,
   required = false,
-  maxLength,
   inputMode,
   disabled = false,
   ref,
@@ -46,7 +45,6 @@ export function TextInput({
   info?: ReactNode;
   error?: string;
   required?: boolean;
-  maxLength?: number;
   inputMode?: 'decimal';
   disabled?: boolean;
   ref?: Ref<HTMLInputElement>;
@@ -68,7 +66,6 @@ export function TextInput({
       value={value}
       onChange={(event) => onChange(event.currentTarget.value)}
       required={required}
-      maxLength={maxLength}
       inputMode={inputMode}
       disabled={disabled}
       style={{

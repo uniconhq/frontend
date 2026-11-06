@@ -20,7 +20,6 @@ import { useMe } from '@/session';
 import { memberName, STATUS_WORD, wayText } from '@/lib/entrants';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_SECTIONS, contestSectionPath, sectionOf } from '@/lib/sections';
-import { teamNameProblem } from '@/lib/team-fields';
 import { formatDateTime } from '@/lib/time';
 import { PageLink } from '@/ui/PageLink';
 import { useInviteChanges } from '../invites/invites';
@@ -30,8 +29,6 @@ import { ENTRANTS, entrantsLine, useEntrants } from './names';
 import classes from './entrants.module.css';
 
 const ONE = `${ENTRANTS}/{entrant_id}` as const;
-const REASON_MAX = 1000;
-const LONGEST_EXTENSION_MINUTES = 365 * 24 * 60;
 /** How often the list is read again, since nothing pushes a change of entrant. */
 const POLL_MS = 30_000;
 /** The address's filter, an entrant's status. */
@@ -61,12 +58,10 @@ function minutesOf(seconds: number): number {
   return Math.round(seconds / 60);
 }
 
-/** The minutes typed, when they are a whole number the server takes. */
+/** The minutes typed, when they are a whole number. */
 function checkedMinutes(typed: string): number | null {
   const trimmed = typed.trim();
-  if (!/^\d+$/.test(trimmed)) return null;
-  const minutes = Number(trimmed);
-  return minutes <= LONGEST_EXTENSION_MINUTES ? minutes : null;
+  return /^\d+$/.test(trimmed) ? Number(trimmed) : null;
 }
 
 function extensionText(entrant: OrganisedEntrant): string {
@@ -180,11 +175,6 @@ function Manage({
 
   const submitName = (event: FormEvent) => {
     event.preventDefault();
-    const problem = teamNameProblem(name);
-    if (problem !== null) {
-      setSaid(problem);
-      return;
-    }
     void run(
       'rename',
       () => rename.mutateAsync({ params: { path: here }, body: { name: name.trim() } }),
@@ -223,7 +213,7 @@ function Manage({
     event.preventDefault();
     const checked = checkedMinutes(minutes);
     if (checked === null) {
-      setSaid('Give a whole number of minutes, up to a year.');
+      setSaid('Give a whole number of minutes.');
       return;
     }
     void sendExtension({ seconds: checked * 60, tasks: only });
@@ -258,7 +248,7 @@ function Manage({
       )}
       {teams && (
         <form className={classes.inline} aria-label="Rename" onSubmit={submitName}>
-          <TextInput label="Name" value={name} onChange={setName} maxLength={60} />
+          <TextInput label="Name" value={name} onChange={setName} />
           <div className={classes.actions}>
             <Button
               size="xs"
@@ -326,7 +316,6 @@ function Manage({
             description="A username, or an email address for someone without an account. They join once they accept."
             value={typed}
             onChange={setTyped}
-            maxLength={254}
           />
           <div className={classes.actions}>
             <Button
@@ -674,7 +663,6 @@ function Row({
                 description="Its members read this on the contest's page."
                 value={reason}
                 onChange={setReason}
-                maxLength={REASON_MAX}
                 required
               />
               <div className={classes.actions}>

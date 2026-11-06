@@ -6,7 +6,7 @@ import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { CONTEST_API, files, repoFiles, standingList } from '@/test/organiser';
 import userEvent from '@/test/user-event';
-import { specCatalogue } from '../formula/catalogue';
+import { specCatalogue } from '@/test/catalogue';
 
 const CONTEST = '/orgs/acme/contests/spring';
 

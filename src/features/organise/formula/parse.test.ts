@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blankBoard, boardScope, givenValues } from '../leaderboards/model';
-import { specCatalogue } from './catalogue';
+import { specCatalogue } from '@/test/catalogue';
 import {
   checkFormula,
   contextAt,
@@ -14,13 +14,7 @@ import {
   type FormulaScope,
 } from './parse';
 import { printFormula } from './print';
-import {
-  columnProblem,
-  limitProblem,
-  nameProblem,
-  NODE_LIMIT,
-  type Tree,
-} from './tree';
+import type { Tree } from './tree';
 
 const catalogue = specCatalogue();
 
@@ -319,10 +313,7 @@ describe('checkFormula', () => {
     ]);
   });
 
-  it('refuses a name a formula cannot read', () => {
-    expect(nameProblem('and')).toMatch(/operator/);
-    expect(nameProblem('2sum')).toMatch(/starting with a letter/);
-    expect(nameProblem('total')).toBeNull();
+  it('cannot read a formula word as a name', () => {
     expect(readLine('and', task, catalogue).unread?.message).toMatch(/cannot be read/);
   });
 
@@ -387,15 +378,5 @@ describe('the line', () => {
     expect(
       namesIn(parsed('otherwise(first(all, all.passed == 0).verdict, "none") == st1')),
     ).toEqual(['all', 'all.passed', 'st1']);
-  });
-
-  it('refuses a tree past the limit, and a leaderboard past 100 columns', () => {
-    const wide: Tree = {
-      block: 'add',
-      of: Array.from({ length: NODE_LIMIT }, () => '1'),
-    };
-    expect(limitProblem(wide)).toMatch(/1,000|1000/);
-    expect(columnProblem(101)).toMatch(/100/);
-    expect(columnProblem(100)).toBeNull();
   });
 });

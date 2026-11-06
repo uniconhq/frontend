@@ -84,27 +84,29 @@ describe('creating an org', () => {
     );
   });
 
-  it('holds the description to 255 characters', async () => {
+  it('sends a description as typed and shows why the save refused it', async () => {
     let sent: unknown = null;
     server.use(
       signedIn,
       contestList,
       http.post('/api/v1/orgs', async ({ request }) => {
         sent = await request.json();
-        return HttpResponse.json({ name: 'acme' }, { status: 201 });
+        return problem(422, 'validation_error', {
+          detail: 'The request has a value that cannot be used.',
+        });
       }),
     );
     const { user } = await openForm();
     await user.type(await screen.findByRole('textbox', { name: /^Name/ }), 'acme');
     const description = screen.getByRole('textbox', { name: /^Description/ });
-    expect(description).toHaveAttribute('maxlength', '255');
-
     await user.click(description);
     await user.paste('x'.repeat(300));
     await user.click(screen.getByRole('button', { name: 'Create org' }));
 
-    await screen.findByRole('heading', { name: 'acme', level: 1 });
-    expect(sent).toEqual({ name: 'acme', description: 'x'.repeat(255) });
+    expect(
+      await screen.findByText('The request has a value that cannot be used.'),
+    ).toBeVisible();
+    expect(sent).toEqual({ name: 'acme', description: 'x'.repeat(300) });
   });
 
   it.each([

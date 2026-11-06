@@ -254,7 +254,6 @@ describe("the task's gradings", () => {
       name: /What the entrant reads/,
     });
     expect(field).toBeRequired();
-    expect(field).toHaveAttribute('maxlength', '500');
     await userEvent.type(field, '   ');
     expect(confirm).toBeDisabled();
     await userEvent.type(field, 'The checker crashed. ');

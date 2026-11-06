@@ -270,9 +270,6 @@ describe('a number typed into a field', () => {
       if ('error' in read) throw new Error(read.error);
       expect(read.doc.toJS(), typed).toEqual({ a: Number(typed) });
     }
-    expect(numberProblem('0x10', true)).toBeUndefined();
-    expect(numberProblem('0o17', true)).toBeUndefined();
-    expect(numberProblem('+.5', true)).toBe('Enter a whole number.');
   });
 
   it('refuses what YAML 1.2 reads as text or as no finite number', () => {

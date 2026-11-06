@@ -57,16 +57,9 @@ function SettingsForm({
   // before the settings are read back.
   const [sent, setSent] = useState<ContestValues | null>(null);
   const unsaved = changed && !(saved && sent === values);
-  const fewestTooMany =
-    teams &&
-    values.fewest !== '' &&
-    numberProblem(values.fewest, true) === undefined &&
-    Number(values.fewest) > Number(values.most);
-  const problems = [
-    numberProblem(values.most, true),
-    numberProblem(values.fewest, true),
-    ...(fewestTooMany ? ['The fewest people in a team is more than the most.'] : []),
-  ].filter((problem) => problem !== undefined);
+  const problems = [numberProblem(values.most), numberProblem(values.fewest)].filter(
+    (problem) => problem !== undefined,
+  );
 
   return (
     <form
@@ -168,7 +161,6 @@ function SettingsForm({
                     label="Most people in a team"
                     value={values.most}
                     onChange={(value) => set('most', value)}
-                    whole
                   />
                 </FieldBox>
                 <FieldBox name="fewest">
@@ -176,13 +168,7 @@ function SettingsForm({
                     label="Fewest people in a team"
                     value={values.fewest}
                     onChange={(value) => set('fewest', value)}
-                    placeholder="1, so one person may enter alone"
-                    error={
-                      fewestTooMany
-                        ? 'This is more than the most people in a team.'
-                        : undefined
-                    }
-                    whole
+                    placeholder="Default"
                   />
                 </FieldBox>
               </div>

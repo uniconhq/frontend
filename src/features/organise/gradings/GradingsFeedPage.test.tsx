@@ -490,7 +490,6 @@ describe('acting on the feed', () => {
     const field = within(dialog).getByRole('textbox', {
       name: /^What the entrant reads/,
     });
-    expect(field).toHaveAttribute('maxlength', '500');
     await user.type(field, '  Our grader broke.  ');
     await user.click(confirm);
 

@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
-import { specCatalogue } from '../formula/catalogue';
+import { specCatalogue } from '@/test/catalogue';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { CONTEST_API, repoFiles } from '@/test/organiser';

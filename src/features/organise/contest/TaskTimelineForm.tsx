@@ -76,7 +76,7 @@ function EntryForm({
     tasks: read.values.tasks.map((old, at) => (at === index ? entry : old)),
   };
   const changed = JSON.stringify(after) !== JSON.stringify(read.values);
-  const problems = [numberProblem(entry.marks, true)].filter(
+  const problems = [numberProblem(entry.marks)].filter(
     (problem) => problem !== undefined,
   );
 
@@ -160,9 +160,8 @@ function EntryForm({
             label="Submissions each entrant may mark"
             value={entry.marks}
             onChange={(value) => set({ marks: value })}
-            placeholder="1"
+            placeholder="Default"
             hint="For the leaderboards that read only the submissions each entrant marks."
-            whole
           />
         </FieldBox>
       )}

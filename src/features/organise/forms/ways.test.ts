@@ -4,7 +4,6 @@ import {
   newSignup,
   readWays,
   registrationSentence,
-  wayProblems,
   writeWays,
   type WayValues,
 } from './ways';
@@ -40,53 +39,21 @@ describe('the ways into a contest', () => {
     const doc = docOf(text);
     writeWays(doc, null, [
       { kind: 'invite', approval: '' },
-      newSignup({ domains: '@U.nus.edu  u.nus.edu', approval: 'auto' }),
+      newSignup({ domains: 'u.nus.edu  comp.nus.edu', approval: 'auto' }),
     ]);
     expect(writeOver(text, doc)).toBe(
-      'name: x\nregistration:\n  capacity: 5\n  ways:\n    - invite: {}\n    - signup:\n        domains:\n          - u.nus.edu\n        approval: auto\n',
+      'name: x\nregistration:\n  capacity: 5\n  ways:\n    - invite: {}\n    - signup:\n        domains:\n          - u.nus.edu\n          - comp.nus.edu\n        approval: auto\n',
     );
     writeWays(doc, [], null);
     expect(writeOver(text, doc)).toBe('name: x\nregistration:\n  capacity: 5\n');
   });
 
-  it('takes domains one each, lower case, without an @', () => {
-    expect(domainsOf(' @U.NUS.edu, u.nus.edu;comp.nus.edu.sg ')).toEqual([
+  it('takes the domains as typed, split at spaces, commas and semicolons', () => {
+    expect(domainsOf(' @U.NUS.edu, u.nus.edu;u.nus.edu ')).toEqual([
+      '@U.NUS.edu',
       'u.nus.edu',
-      'comp.nus.edu.sg',
+      'u.nus.edu',
     ]);
-  });
-
-  it('says what will not do: two invite ways, two sign-ups of one name, a domain that is none', () => {
-    expect(
-      wayProblems([
-        { kind: 'invite', approval: '' },
-        { kind: 'invite', approval: '' },
-        newSignup({ name: 'A' }),
-        newSignup({ name: 'a', domains: 'nus' }),
-      ]),
-    ).toEqual([
-      'There is already a way in by invite, and a contest has at most one.',
-      'Two sign-ups have the same name.',
-      '“nus” is not a domain. Write one such as u.nus.edu, or *.nus.edu.sg to take nus.edu.sg and every domain under it.',
-    ]);
-  });
-
-  it('takes a domain and every domain under it as the forge does, *. as the whole first part', () => {
-    const problems = (domains: string) => wayProblems([newSignup({ domains })]);
-    expect(problems('*.nus.edu.sg, u.nus.edu, a-b.c9.org')).toEqual([]);
-    expect(problems('*.sg')).toEqual([
-      '“*.sg” is not a domain. Write one such as u.nus.edu, or *.nus.edu.sg to take nus.edu.sg and every domain under it.',
-    ]);
-    for (const domain of [
-      '*nus.edu.sg',
-      'a.*.edu',
-      '*.*.edu.sg',
-      '-a.edu',
-      'a-.edu',
-      'a..edu',
-    ]) {
-      expect(problems(domain)).toHaveLength(1);
-    }
   });
 
   /** Who one way lets in, as the registration sentence starts. */

@@ -19,7 +19,6 @@ import {
   sizeSentence,
   wayText,
 } from '@/lib/entrants';
-import { teamNameProblem } from '@/lib/team-fields';
 import { formatDateTime } from '@/lib/time';
 import classes from './entry.module.css';
 
@@ -171,13 +170,9 @@ function RegisterForm({
   const team = inTeams(entry);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-  const [problem, setProblem] = useState<string | null>(null);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const found = team ? teamNameProblem(name) : null;
-    setProblem(found);
-    if (found !== null) return;
     void change.run('register', () =>
       register.mutateAsync({
         params: { path },
@@ -201,20 +196,7 @@ function RegisterForm({
           them joins by accepting.
         </BodyText>
       )}
-      {team && (
-        <TextInput
-          label="Team name"
-          value={name}
-          onChange={setName}
-          maxLength={60}
-          required
-        />
-      )}
-      {problem !== null && (
-        <div role="alert">
-          <BodyText tone="secondary">{problem}</BodyText>
-        </div>
-      )}
+      {team && <TextInput label="Team name" value={name} onChange={setName} required />}
       {entry.asks_code && (
         <TextInput
           label="Contest code"
@@ -400,7 +382,6 @@ function InviteForm({
         }
         value={typed}
         onChange={setTyped}
-        maxLength={254}
         disabled={full}
         required
       />
@@ -447,13 +428,11 @@ function TeamName({
   );
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(entrant.name ?? '');
-  const [problem, setProblem] = useState<string | null>(null);
   const edit = useRef<HTMLButtonElement>(null);
   const changed = name.trim() !== (entrant.name ?? '');
 
   const close = () => {
     setEditing(false);
-    setProblem(null);
     // Back on Edit once it is drawn again.
     requestAnimationFrame(() => edit.current?.focus());
   };
@@ -463,9 +442,6 @@ function TeamName({
       close();
       return;
     }
-    const found = teamNameProblem(name);
-    setProblem(found);
-    if (found !== null) return;
     const outcome = await change.run('rename', () =>
       rename.mutateAsync({ params: { path }, body: { name: name.trim() } }),
     );
@@ -506,13 +482,7 @@ function TeamName({
         }
       }}
     >
-      <TextInput
-        label="Team name"
-        value={name}
-        onChange={setName}
-        maxLength={60}
-        autoFocus
-      />
+      <TextInput label="Team name" value={name} onChange={setName} autoFocus />
       <Button
         size="xs"
         type="submit"
@@ -529,11 +499,6 @@ function TeamName({
       >
         Cancel
       </Button>
-      {problem !== null && (
-        <div role="alert">
-          <BodyText tone="secondary">{problem}</BodyText>
-        </div>
-      )}
     </form>
   );
 }

@@ -10,14 +10,13 @@ import {
 } from './scoring-model';
 import { emptyTuple, type AxisValues } from '../forms/task-values';
 import { describe, expect, it } from 'vitest';
-import { specCatalogue } from '../formula/catalogue';
+import { specCatalogue } from '@/test/catalogue';
 import { readLine, type FormulaScope } from '../formula/parse';
 import type { DeclaredInput } from '@/api/types';
 import { readTask, writeTask } from '../forms/task-values';
 import { exactAt, parseYaml, writeYaml, type Doc } from '../forms/yaml-doc';
 import {
   axisColumns,
-  checkProblem,
   columnsOf,
   printed,
   emptyShow,
@@ -154,17 +153,6 @@ describe('a check', () => {
     expect(text).toContain('n: 6\n');
     expect(text).toContain('strict: false\n');
     expect(text).toContain('mode: "7"\n');
-  });
-
-  it('needs the verdict or a value it should get', () => {
-    const empty = { key: 'c', submit: {}, verdict: '', values: [] };
-    expect(checkProblem(empty, 0)).toBe(
-      'Check 1 needs the verdict or a value it should get.',
-    );
-    expect(checkProblem({ ...empty, verdict: 'output_limit' }, 0)).toBeUndefined();
-    expect(
-      checkProblem({ ...empty, values: [{ name: 'total', expected: '3' }] }, 0),
-    ).toBeUndefined();
   });
 });
 

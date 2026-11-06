@@ -1,4 +1,4 @@
-import { specCatalogue } from '../src/features/organise/formula/catalogue';
+import { specCatalogue } from '../src/test/catalogue';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { components } from '../src/api/schema';
 
@@ -607,7 +607,7 @@ test('an organiser reads how many submissions a task takes', async ({ page }) =>
   );
   await expect(
     submissions.getByRole('textbox', { name: 'Most submissions' }),
-  ).toHaveAttribute('placeholder', '50');
+  ).toHaveAttribute('placeholder', 'Default');
 });
 
 test('an organiser ticks the named runs of a group and keeps its shown runs on rename', async ({
@@ -787,9 +787,7 @@ test('the Runs card pairs files, lines up its cells, and gives a cell to the ent
   await page
     .getByRole('menuitem', { name: 'The entrant gives this one', exact: true })
     .click();
-  await expect(
-    runs.getByText('The entrant gives it · up to 10 MB', { exact: true }),
-  ).toBeVisible();
+  await expect(runs.getByText('The entrant gives it', { exact: true })).toBeVisible();
 });
 
 test('a new workflow asks only for its owner and name and opens an empty draft', async ({

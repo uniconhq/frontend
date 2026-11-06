@@ -176,12 +176,7 @@ export function StopNewUse({ page, version }: { page: WorkflowPage; version: str
           {mark ? (
             <BodyText>{mark.reason}</BodyText>
           ) : (
-            <TextInput
-              label="Reason"
-              value={reason}
-              onChange={setReason}
-              maxLength={2048}
-            />
+            <TextInput label="Reason" value={reason} onChange={setReason} />
           )}
           {error && <ErrorBlock error={error} />}
           <Button

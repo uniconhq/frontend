@@ -19,7 +19,6 @@ import {
   DEFAULT_WAYS,
   newSignup,
   registrationSentence,
-  wayProblems,
   type WayValues,
 } from '../forms/ways';
 import { numberProblem } from '../forms/yaml-doc';
@@ -73,9 +72,9 @@ const APPROVAL = [
   { value: 'manual', label: 'An organiser approves each one' },
 ];
 
-/** What is wrong with the ways as typed, a ticked condition left empty among it. */
+/** A ticked condition left empty, which the file has no place for. */
 function problemsOf(ways: WayValues[], ticks: Ticks[]): string[] {
-  const empty = ways.flatMap((way, at) => {
+  return ways.flatMap((way, at) => {
     if (way.kind !== 'signup') return [];
     const tick = ticks[at] ?? ticksOf(way);
     return [
@@ -89,7 +88,6 @@ function problemsOf(ways: WayValues[], ticks: Ticks[]): string[] {
         : []),
     ];
   });
-  return [...wayProblems(ways), ...empty];
 }
 
 /**
@@ -308,7 +306,7 @@ function EntryForm({
   const ways = values.ways;
   const changed = JSON.stringify(values) !== JSON.stringify(read.values);
   const problems = [
-    numberProblem(values.capacity, true),
+    numberProblem(values.capacity),
     ...(ways === null ? [] : problemsOf(ways, ticks)),
   ].filter((problem) => problem !== undefined);
   const savedInvite = (read.values.ways ?? []).some((way) => way.kind === 'invite');
@@ -523,9 +521,8 @@ function EntryForm({
             label="Most entrants"
             value={values.capacity}
             onChange={(capacity) => set('capacity', capacity)}
-            placeholder="No limit"
+            placeholder="Default"
             hint="Entrants waiting for approval count towards it."
-            whole
             disabled={locked}
           />
         </FieldBox>

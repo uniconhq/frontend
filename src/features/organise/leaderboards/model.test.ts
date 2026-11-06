@@ -1,6 +1,6 @@
 import { keyFromName, withBoardName, audienceSentence, blankBoard } from './model';
 import { describe, expect, it } from 'vitest';
-import { specCatalogue } from '../formula/catalogue';
+import { specCatalogue } from '@/test/catalogue';
 import {
   exactJS,
   isRecord,
@@ -306,14 +306,15 @@ describe('leaderboards written into contest.yaml', () => {
     );
   });
 
-  it('leaves a list of leaderboards as stored', () => {
-    const text = 'leaderboards:\n  - name: Standings\n';
-    const doc = open(text);
+  it('reads leaderboards stored as a list as none, and writes over them once one is added', () => {
+    const doc = open('leaderboards:\n  - name: Standings\n');
     const read = readLeaderboards(doc);
-    expect(read.legacy).toBe(true);
+    expect(read.boards).toEqual([]);
     writeLeaderboards(doc, read, { ...read, boards: [board({ key: 'gradebook' })] });
     const saved = exactJS(doc);
-    expect(isRecord(saved) && Array.isArray(saved['leaderboards'])).toBe(true);
+    expect(isRecord(saved) && Object.keys(saved['leaderboards'] as object)).toEqual([
+      'gradebook',
+    ]);
   });
 });
 
@@ -439,17 +440,7 @@ describe('a name with a -', () => {
         of: [{ column: 'best-run' }, { column: ['rival-board', 'top-score'] }],
       },
     ]);
-    expect(
-      problems(
-        one,
-        catalogue,
-        tasks,
-        gives,
-        0,
-        '2030-10-01T09:00:00Z',
-        '2030-10-01T14:00:00Z',
-      ),
-    ).toEqual([]);
+    expect(problems(one, catalogue, tasks, gives)).toEqual([]);
   });
 });
 
@@ -510,172 +501,71 @@ describe('a column of another leaderboard', () => {
 });
 
 describe('what the editor refuses', () => {
-  const now = new Date('2026-10-25T00:00:00Z').getTime();
+  const off = { locked: false, on: false, from: '', untilStaff: true, until: '' };
 
-  function found(
-    over: Partial<BoardDraft> & Pick<BoardDraft, 'key'>,
-    tasks = ['islands'],
-  ) {
-    const doc = open(FILE);
-    const one = draft(doc, [board(over)], {
-      locked: false,
-      on: false,
-      from: '',
-      untilStaff: true,
-      until: '',
-    });
-    return problems(
-      one,
-      catalogue,
-      tasks,
-      {},
-      now,
-      '2030-10-01T09:00:00Z',
-      '2030-10-01T14:00:00Z',
-    );
+  function found(boards: BoardDraft[], hold = off) {
+    return problems(draft(open(FILE), boards, hold), catalogue, ['islands'], {});
   }
 
-  it('refuses a key the save would refuse', () => {
-    expect(
-      found({ key: 'a'.repeat(25) })
-        .map((item) => item.message)
-        .join(' '),
-    ).toMatch(/24/);
-    expect(
-      found({ key: 'islands' })
-        .map((item) => item.message)
-        .join(' '),
-    ).toMatch(/tasks and leaderboards share one set of names/);
-    expect(found({ key: 'and' }).map((item) => item.message)).toContain(
-      "and is a word a formula reads as an operator, so it can't name a value. " +
-        'Choose another name.',
-    );
-    expect(
-      found({ key: 'house_prices' }, ['house-prices']).map((item) => item.message),
-    ).toContain(
-      'house_prices reads as house-prices in a formula, where each - is written _. ' +
-        'Name the leaderboard otherwise.',
-    );
+  it('refuses only what the file has no place for: one key twice, a column with no name or a taken one', () => {
+    expect(found([board({ key: 'a' }), board({ key: 'a' })])).toContainEqual({
+      field: 'a.key',
+      message: 'Another leaderboard has this key.',
+    });
+    const columns = (...names: string[]) =>
+      found([
+        board({
+          key: 'b',
+          columns: names.map((name, at) => ({
+            key: `c${String(at)}`,
+            name,
+            line: null,
+            tree: '1',
+          })),
+          sort: [],
+          display: [],
+        }),
+      ]).map((item) => item.message);
+    expect(columns('')).toEqual(['Give the column a name.']);
+    expect(columns('x', 'x')).toEqual([
+      'Another column has this name.',
+      'Another column has this name.',
+    ]);
   });
 
-  it('takes a - in a column name, and refuses one that reads as another name', () => {
-    const named = (name: string, tasks = ['islands']) =>
-      found(
-        {
-          key: 'board',
-          columns: [
-            { key: 'a', name, line: null, tree: '1' },
-            { key: 'b', name: 'points', line: null, tree: '1' },
+  it('leaves every other rule of a leaderboard to the save', () => {
+    expect(
+      found([
+        board({ key: 'islands', who: 'everyone', rows: 'own', columns: [] }),
+        board({
+          key: 'notes',
+          columns: [{ key: 'c', name: 'Note', line: '"hi"', tree: null }],
+          sort: [
+            { name: 'Note', way: 'desc' },
+            { name: 'gone', way: 'asc' },
           ],
-        },
-        tasks,
-      ).map((item) => item.message);
-    expect(named('best-run')).toEqual([]);
-    expect(named('house_prices', ['house-prices'])).toContain(
-      'house_prices reads as house-prices in a formula, where each - is written _. ' +
-        'Name the column otherwise.',
-    );
-    expect(named('or').join(' ')).toMatch(/operator/);
-    expect(named('Best').join(' ')).toMatch(/hyphens/);
-  });
-
-  it('refuses own rows for everyone, a sorted text column and a shown pick', () => {
-    expect(
-      found({ key: 'gradebook', who: 'everyone', rows: 'own' }).some((item) =>
-        item.message.includes('guest has none'),
-      ),
-    ).toBe(true);
-    const text = found({
-      key: 'notes',
-      columns: [{ key: 'c', name: 'note', line: '"hi"', tree: null }],
-      sort: [{ name: 'note', way: 'desc' }],
-      display: [{ name: 'note', decimals: '' }],
-    });
-    expect(text.some((item) => item.message.includes('text column'))).toBe(true);
-    const pick = found({
-      key: 'latest',
-      columns: [{ key: 'c', name: 'last', line: 'latest(islands)', tree: null }],
-      sort: [{ name: 'last', way: 'desc' }],
-      display: [{ name: 'last', decimals: '' }],
-    });
-    expect(
-      pick.some(
-        (item) => item.field === 'latest.display' && item.message.includes('pick'),
-      ),
-    ).toBe(true);
-    expect(
-      pick.some(
-        (item) => item.field === 'latest.sort' && item.message.includes('pick'),
-      ),
-    ).toBe(true);
+          display: [{ name: 'Note', decimals: '11' }],
+        }),
+      ]),
+    ).toEqual([]);
   });
 
   it('does not call a saved formula empty before the catalogue loads', () => {
-    const doc = open(FILE);
-    const one = draft(doc, [board({ key: 'gradebook' })], {
-      locked: false,
-      on: false,
-      from: '',
-      untilStaff: true,
-      until: '',
-    });
+    const one = draft(open(FILE), [board({ key: 'gradebook' })], off);
     expect(
-      problems(
-        one,
-        null,
-        [],
-        {},
-        now,
-        '2030-10-01T09:00:00Z',
-        '2030-10-01T14:00:00Z',
-      ).some((item) => item.message === 'Give a formula.'),
+      problems(one, null, [], {}).some((item) => item.message === 'Give a formula.'),
     ).toBe(false);
   });
 
-  it('refuses a hold that has already started', () => {
-    const doc = open(FILE);
-    const one = draft(doc, [], {
-      locked: false,
-      on: true,
-      from: '2020-01-01T00:00',
-      untilStaff: true,
-      until: '',
-    });
+  it('asks for the hold’s times, leaving when they may be to the save', () => {
+    const on = { ...off, on: true, untilStaff: false };
+    expect(found([], on)).toEqual([
+      { field: 'hold.from', message: 'Give the time the freeze starts.' },
+      { field: 'hold.until', message: 'Give the time the freeze ends.' },
+    ]);
     expect(
-      problems(
-        one,
-        catalogue,
-        [],
-        {},
-        now,
-        '2030-10-01T09:00:00Z',
-        '2030-10-01T14:00:00Z',
-      ).some((item) => item.field === 'hold.from'),
-    ).toBe(true);
-  });
-
-  it('keeps a stored hold that has since started, and refuses moving it into the past', () => {
-    const later = new Date('2031-01-01T00:00:00Z').getTime();
-    const hold = {
-      locked: false,
-      on: true,
-      from: '2030-10-01T12:00',
-      untilStaff: true,
-      until: '',
-    };
-    const fromOf = (moved: typeof hold) =>
-      problems(
-        draft(open(FILE), [], moved),
-        catalogue,
-        [],
-        {},
-        later,
-        '2030-11-01T09:00:00Z',
-        '2030-11-01T14:00:00Z',
-        hold,
-      ).filter((item) => item.field === 'hold.from');
-    expect(fromOf(hold)).toEqual([]);
-    expect(fromOf({ ...hold, from: '2030-10-01T12:30' }).length).toBeGreaterThan(0);
+      found([], { ...on, from: '2020-01-01T01:00', until: '2020-01-01T00:00' }),
+    ).toEqual([]);
   });
 });
 
@@ -740,7 +630,6 @@ describe('a task whose settings cannot be read', () => {
 });
 
 describe('a stored column whose line does not read back to it', () => {
-  const now = new Date('2026-10-25T00:00:00Z').getTime();
   const found = (column: BoardDraft['columns'][number]) =>
     problems(
       draft(open(FILE), [board({ key: 'one', columns: [column] })], {
@@ -753,9 +642,6 @@ describe('a stored column whose line does not read back to it', () => {
       catalogue,
       ['islands'],
       {},
-      now,
-      '2030-10-01T09:00:00Z',
-      '2030-10-01T14:00:00Z',
     ).map((item) => item.message);
   const odd = { block: 'max', of: ['1', '2'], colour: 'red' };
 
@@ -776,7 +662,6 @@ describe('one leaderboard name', () => {
     ['2026 results', 'board_2026_results'],
     ['', 'leaderboard'],
     ['é!@', 'leaderboard'],
-    ['and', 'and_2'],
     ['_Results', 'board__results'],
     ['a'.repeat(30), 'a'.repeat(24)],
   ])('makes the key for %s', (name, key) => expect(keyFromName(name, [])).toBe(key));

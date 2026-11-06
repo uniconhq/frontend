@@ -199,6 +199,41 @@ describe('the entrants page', () => {
     ]);
   });
 
+  it('sends extra time over a year and shows the refusal in the server’s words', async () => {
+    server.use(signedIn);
+    entrantsWith([red, blue]);
+    const sent: unknown[] = [];
+    server.use(
+      http.put(`${ROWS}/:id/extension`, async ({ request }) => {
+        sent.push(await request.json());
+        return problem(422, 'invalid_extension', {
+          detail: 'Extra time can be at most a year.',
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Change the name, members and extra time of Red',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Red: name, members and extra time',
+    });
+    const minutes = within(dialog).getByRole('textbox', { name: /Extra minutes/ });
+    await user.clear(minutes);
+    await user.type(minutes, '600000');
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Save the extra time' }),
+    );
+
+    expect(
+      await within(dialog).findByText('Extra time can be at most a year.'),
+    ).toBeVisible();
+    expect(sent).toMatchObject([{ seconds: 36_000_000 }]);
+  });
+
   it('shows hiding lines and confirms the exact extension that was asked about', async () => {
     server.use(signedIn);
     entrantsWith([red, blue]);

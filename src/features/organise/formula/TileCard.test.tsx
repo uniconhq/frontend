@@ -2,7 +2,7 @@ import { act, fireEvent, screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render';
 import { FormulaTiles } from './Editor';
-import { specCatalogue } from './catalogue';
+import { specCatalogue } from '@/test/catalogue';
 
 function tiles() {
   const insert = vi.fn();

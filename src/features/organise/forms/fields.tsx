@@ -41,7 +41,6 @@ export function NumberField({
   placeholder,
   info,
   error,
-  whole = false,
   disabled = false,
 }: {
   label: string;
@@ -51,7 +50,6 @@ export function NumberField({
   placeholder?: string;
   info?: ReactNode;
   error?: string;
-  whole?: boolean;
   disabled?: boolean;
 }) {
   return (
@@ -60,7 +58,7 @@ export function NumberField({
       value={value}
       onChange={onChange}
       inputMode="decimal"
-      description={numberProblem(value, whole) ?? hint}
+      description={numberProblem(value) ?? hint}
       placeholder={placeholder}
       info={info}
       error={error}

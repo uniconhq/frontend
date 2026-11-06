@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { parse } from 'yaml';
 import type { FileContent } from '@/api/types';
 import { renderApp } from '@/test/render';
-import { server, signedIn, someone } from '@/test/server';
+import { problem, server, signedIn, someone } from '@/test/server';
 import { invite } from '@/test/invites';
 import { CONTEST_API, repoFiles, taskList } from '@/test/organiser';
 import { localOf } from '../forms/times';
@@ -76,7 +76,7 @@ describe('how people enter', { timeout: 20_000 }, () => {
       students.getByRole('radio', { name: 'Approved straight away' }),
     ).toBeChecked();
     fireEvent.change(students.getByLabelText('Email domains'), {
-      target: { value: '@U.NUS.edu, u.nus.edu' },
+      target: { value: 'u.nus.edu' },
     });
     expect(
       within(form).getByRole('status', { name: 'What it adds up to' }),
@@ -155,6 +155,47 @@ describe('how people enter', { timeout: 20_000 }, () => {
     expect(
       within(form).getByRole('button', { name: 'Save how people enter' }),
     ).toBeDisabled();
+  });
+
+  it('sends a domain as typed and opens the one the save refused, focused', async () => {
+    server.use(signedIn);
+    const sent = settings(
+      `${BASE}registration:\n  ways:\n    - signup: {domains: [u.nus.edu]}\n`,
+    );
+    const message =
+      'Give a domain such as u.nus.edu, or *.nus.edu.sg to take nus.edu.sg and every domain under it.';
+    server.use(
+      http.put(FILE, async ({ request }) => {
+        sent.push(((await request.json()) as { content: string }).content);
+        return problem(422, 'invalid_definition', {
+          errors: [{ path: 'registration.ways[0].signup.domains[0]', message }],
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    const form = await openForm();
+
+    const domains = way(form, 'Sign-up').getByLabelText('Email domains');
+    fireEvent.change(domains, { target: { value: '@U.nus.edu' } });
+    await user.click(
+      within(form).getByRole('button', { name: 'Save how people enter' }),
+    );
+
+    const alert = await screen.findByRole('alert');
+    expect(parse(sent[0] ?? '')).toMatchObject({
+      registration: { ways: [{ signup: { domains: ['@U.nus.edu'] } }] },
+    });
+    const link = within(alert).getByRole('link', {
+      name: 'How people enter, way 1: Email domains',
+    });
+    expect(alert).toHaveTextContent(message);
+    await user.click(link);
+    // The field's box opens at its first control, the tick above the domains.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('checkbox', { name: 'Only email addresses at these domains' }),
+      ).toHaveFocus(),
+    );
   });
 
   it('removes a way once asked, adds invites, and says when nobody can register', async () => {

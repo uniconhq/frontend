@@ -72,25 +72,13 @@ export function readWays(doc: Doc): WayValues[] | null | 'unreadable' {
   return read;
 }
 
-/** The domains typed into a sign-up, each once, lower case, without an `@` before it. */
+/** The domains typed into a sign-up, as typed. */
 export function domainsOf(typed: string): string[] {
-  const found = typed
-    .split(/[\s,;]+/)
-    .map((domain) => domain.trim().replace(/^@/, '').toLowerCase())
-    .filter((domain) => domain !== '');
-  return [...new Set(found)];
+  return typed.split(/[\s,;]+/).filter((domain) => domain !== '');
 }
 
 /** What starts a domain that takes itself and every domain under it (#439). */
 const UNDER = '*.';
-
-/**
- * A domain as the forge takes it: two or more labels of lower-case letters,
- * digits and hyphens joined by dots, none starting or ending with a hyphen,
- * after an optional `*.` standing as the whole first label.
- */
-const DOMAIN =
-  /^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 
 /** A way as the file holds it, with only what is set. */
 function wayItem(way: WayValues): Record<string, unknown> {
@@ -124,36 +112,6 @@ export function writeWays(
   }
   writeAt(doc, ['registration', 'ways'], []);
   doc.setIn(['registration', 'ways'], nodeFor(doc, after.map(wayItem)));
-}
-
-/** What is wrong with a way as typed, or nothing. */
-export function wayProblems(ways: WayValues[]): string[] {
-  const problems: string[] = [];
-  if (ways.filter((way) => way.kind === 'invite').length > 1) {
-    problems.push(
-      'There is already a way in by invite, and a contest has at most one.',
-    );
-  }
-  const names = ways
-    .filter(
-      (way): way is Extract<WayValues, { kind: 'signup' }> => way.kind === 'signup',
-    )
-    .map((way) => way.name.trim().toLowerCase())
-    .filter((name) => name !== '');
-  if (new Set(names).size !== names.length) {
-    problems.push('Two sign-ups have the same name.');
-  }
-  for (const way of ways) {
-    if (way.kind !== 'signup') continue;
-    for (const domain of domainsOf(way.domains)) {
-      if (!DOMAIN.test(domain)) {
-        problems.push(
-          `“${domain}” is not a domain. Write one such as u.nus.edu, or ${UNDER}nus.edu.sg to take nus.edu.sg and every domain under it.`,
-        );
-      }
-    }
-  }
-  return problems;
 }
 
 /** Whether a way's people are approved straight away. */

@@ -387,6 +387,32 @@ describe('your entry in a contest entered in teams', () => {
     expect(within(part).getByRole('button', { name: 'Join Blue' })).toBeDisabled();
   });
 
+  it('sends a team name as typed and says why the server refused it', async () => {
+    let body: unknown = null;
+    server.use(
+      signedIn,
+      homeWith(() => entry(teams)),
+      http.post(`${CONTEST_API}/entrants`, async ({ request }) => {
+        body = await request.json();
+        return problem(422, 'invalid_entrant_name', {
+          detail: 'A name is at most 60 characters.',
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const part = await yourEntry();
+    const name = within(part).getByRole('textbox', { name: /Team name/ });
+    await user.click(name);
+    await user.paste('r'.repeat(61));
+    await user.click(within(part).getByRole('button', { name: 'Register the team' }));
+
+    const alert = await within(part).findByRole('alert');
+    expect(alert).toHaveTextContent('A name is at most 60 characters.');
+    expect(body).toEqual({ name: 'r'.repeat(61), code: null });
+  });
+
   it('says a refusal in words until it is dismissed', async () => {
     server.use(
       signedIn,

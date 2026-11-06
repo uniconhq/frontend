@@ -1,8 +1,7 @@
-import { sourcesOf } from '../formula/flow';
 import type { Catalogue } from '../formula/catalogue';
-import { readLine, type FormulaScope, type Reading } from '../formula/parse';
+import { readLine, type FormulaScope } from '../formula/parse';
 import { printFormula } from '../formula/print';
-import { nameProblem, type Tree } from '../formula/tree';
+import type { Tree } from '../formula/tree';
 import {
   NumberText,
   isRecord,
@@ -724,14 +723,6 @@ function checksOf(
   });
 }
 
-/** Why a check cannot be saved: it names neither a verdict nor a value it should get. */
-export function checkProblem(check: CheckDraft, index: number): string | undefined {
-  const named = check.values.some((value) => value.name.trim() !== '');
-  return check.verdict.trim() === '' && !named
-    ? `Check ${String(index + 1)} needs the verdict or a value it should get.`
-    : undefined;
-}
-
 /** The runs the axes make, first axis outermost, organiser cells only. */
 export function runsOf(axes: AxisValues[]): RunRow[] {
   const filled = axes.filter(
@@ -960,78 +951,27 @@ export function printed(value: ScoreValue, catalogue: Catalogue | null): string 
   return printFormula(value.tree, catalogue, 'task');
 }
 
-function loopOf(name: string, reads: Map<string, string[]>): string[] | null {
-  const seen = new Set<string>();
-  const walk = (at: string, path: string[]): string[] | null => {
-    for (const next of reads.get(at) ?? []) {
-      if (next === name) return [...path, next];
-      if (seen.has(next)) continue;
-      seen.add(next);
-      const found = walk(next, [...path, next]);
-      if (found !== null) return found;
-    }
-    return null;
-  };
-  return walk(name, [name]);
-}
-
-/** Why a value or a group cannot be saved, by its key. */
+/**
+ * Why a value or a group cannot be saved, by its key: what the file has no
+ * place for. The forge checks the rest.
+ */
 export function troublesOf(
   groups: ScoreGroup[],
   values: ScoreValue[],
-  readings: Record<string, Reading | undefined>,
-  runs: RunRow[],
 ): Map<string, string> {
-  const names = new Set(values.map((value) => value.name));
-  const reads = new Map(
-    values.map((value) => [
-      value.name,
-      sourcesOf(readings[value.key]?.node ?? null, names),
-    ]),
-  );
   const troubles = new Map<string, string>();
   for (const group of groups) {
-    const problem =
-      group.name.trim() === ''
-        ? 'A group needs a name.'
-        : group.none || !runs.some((run) => inGroup(run, group))
-          ? `${group.name} matches no runs`
-          : Object.keys(group.picks).length === 0
-            ? "Pick the group's runs by at least one repeated input, such as input: [tests/1.in]."
-            : nameProblem(group.name);
-    if (problem !== null) troubles.set(group.key, problem);
-    else if (group.name === 'all' || FACTS.some((fact) => fact.name === group.name))
-      troubles.set(group.key, `${group.name} is already a name a formula reads`);
-    else if (values.some((value) => value.name === group.name))
-      troubles.set(group.key, `a value is called ${group.name} too: rename one`);
+    if (group.name.trim() === '') troubles.set(group.key, 'A group needs a name.');
+    // A pick of nothing reads as every run, so the writer leaves it out.
+    else if (group.none && Object.keys(group.picks).length === 0)
+      troubles.set(group.key, `${group.name} matches no runs`);
   }
   for (const value of values) {
-    if (troubles.has(value.key)) continue;
-    const problem =
-      value.name.trim() === '' ? 'A value needs a name.' : nameProblem(value.name);
-    if (problem !== null) {
-      troubles.set(value.key, problem);
-      continue;
-    }
-    const twin = values.some(
-      (other) => other.key !== value.key && other.name === value.name,
+    if (value.name.trim() === '') troubles.set(value.key, 'A value needs a name.');
+    else if (
+      values.some((other) => other.key !== value.key && other.name === value.name)
     )
-      ? 'another value'
-      : groups.some((group) => group.name === value.name) || value.name === 'all'
-        ? 'a group'
-        : FACTS.some((fact) => fact.name === value.name)
-          ? 'a fact'
-          : null;
-    if (twin !== null) {
-      troubles.set(value.key, `${twin} is called ${value.name} too: rename one`);
-      continue;
-    }
-    const loop = loopOf(value.name, reads);
-    if (loop !== null)
-      troubles.set(
-        value.key,
-        `reads itself, round ${loop.join(' → ')}: break the loop`,
-      );
+      troubles.set(value.key, `another value is called ${value.name} too: rename one`);
   }
   return troubles;
 }
@@ -1044,7 +984,6 @@ export function renamed(
   catalogue: Catalogue | null,
 ): ScoreValue[] | null {
   if (from === to || from.trim() === '' || to.trim() === '') return null;
-  if (nameProblem(to) !== null) return null;
   // The caller has already given this value its new name, so one `to` is itself.
   if (values.filter((value) => value.name === to).length > 1) return null;
   // Only a `{value: from}` leaf names the value: a run's column, a pick's

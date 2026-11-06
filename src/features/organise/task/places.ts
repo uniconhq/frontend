@@ -73,14 +73,12 @@ function wholePlace(message: string): TaskPlace {
 
 /**
  * The input a file belongs to by its folder: a setting's own files go under
- * `<input>/` (M51), or `inputs/<input>/` for an input whose id is a folder
- * the format gives meaning to. Null for a path in no input's folder.
+ * `<input>/` (M51). Null for a path in no input's folder.
  */
 function inputOfFile(path: string, titles: ReadonlyMap<string, string>): string | null {
   const parts = path.split('/');
   if (parts.length < 2) return null;
-  const [first = '', second = ''] = parts;
-  if (first === 'inputs' && parts.length >= 3 && titles.has(second)) return second;
+  const [first = ''] = parts;
   return titles.has(first) ? first : null;
 }
 

@@ -422,7 +422,7 @@ function RunsRow({
           <TextInput
             label={`Maximum size of row ${String(row + 1)}`}
             value={tuple.maxSize}
-            placeholder="10MB"
+            placeholder="Default"
             disabled={disabled}
             onChange={(maxSize) => onChange({ ...tuple, maxSize })}
             autoFocus
@@ -520,8 +520,9 @@ function RunCell({
       <div className={classes.runCell}>
         {cell.entrant ? (
           <span>
-            The entrant gives it · up to{' '}
-            {(limit || '10MB').replace(/([0-9])\s*([A-Za-z]+)/, '$1 $2')}
+            The entrant gives it
+            {limit !== '' &&
+              ` · up to ${limit.replace(/([0-9])\s*([A-Za-z]+)/, '$1 $2')}`}
           </span>
         ) : file ? (
           cell.value === '' ? (

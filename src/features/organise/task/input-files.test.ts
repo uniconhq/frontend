@@ -71,29 +71,16 @@ describe('a file chosen for a setting', () => {
     expect(staged.planned.map((change) => change.path)).toEqual(['checker/checker.py']);
   });
 
-  it('goes under inputs/ for an input named as a folder the format reserves, taking out nothing there', async () => {
+  it('puts a folder’s files under the input’s own folder, by their place inside it', async () => {
     taskWithFiles();
     const folder = await stageInputFiles(
       PLACE,
-      declared('tests', 'folder'),
+      declared('data', 'folder'),
       [inFolder('runner.py', 'run\n')],
-      'tests/',
+      '',
     );
-    expect(folder.value).toBe('inputs/tests/');
-    expect(folder.planned.map((change) => change.path)).toEqual([
-      'inputs/tests/runner.py',
-    ]);
-
-    const file = await stageInputFiles(
-      PLACE,
-      declared('public', 'file'),
-      [new File(['int main() {}\n'], 'checker.cpp')],
-      'public/diagram.png',
-    );
-    expect(file.value).toBe('inputs/public/checker.cpp');
-    expect(file.planned.map((change) => change.path)).toEqual([
-      'inputs/public/checker.cpp',
-    ]);
+    expect(folder.value).toBe('data/');
+    expect(folder.planned.map((change) => change.path)).toEqual(['data/runner.py']);
   });
 });
 
@@ -104,8 +91,6 @@ describe('an upload a setting would write', () => {
     expect(uploadFits(checker, 'checker/deep/big.bin')).toBe(false);
     expect(uploadFits(checker, 'checker/')).toBe(false);
     expect(uploadFits(checker, 'checkers/big.bin')).toBe(false);
-    expect(uploadFits(declared('tests', 'file'), 'inputs/tests/big.bin')).toBe(true);
-    expect(uploadFits(declared('tests', 'file'), 'tests/big.bin')).toBe(false);
     expect(uploadFits(declared('data', 'folder'), 'data/big.bin')).toBe(false);
   });
 });

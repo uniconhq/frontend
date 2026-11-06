@@ -34,29 +34,6 @@ export type ShowRow = {
 /** The one warning, on a row: it was shown always, and entrants have been graded. */
 const SEEN = 'Entrants may have seen this. The save asks before hiding it.';
 
-const UNKNOWN = 'Not a part of this task, so the save is refused. Turn it off.';
-
-/** Where a name belongs, as the forge says it of one shown in another section. */
-type Section = 'values' | 'inputs' | 'outputs' | 'fields';
-
-const BELONGS: Record<Section, (name: string) => string> = {
-  values: (name) => `${name} is a value, so show it under Values. Turn it off here.`,
-  inputs: (name) =>
-    `${name} is set once for the whole task, so show it under Shared inputs. Turn it off here.`,
-  outputs: (name) =>
-    `${name} is given once for every run, so show it under Once outputs. Turn it off here.`,
-  fields: (name) =>
-    `${name} is given for each run, so show it among a run's fields. Turn it off here.`,
-};
-
-/** A row, and for a name no row of its section has, why the save refuses it. */
-type Listed = ShowRow & { unknown?: string };
-
-/** Why the save refuses a run entry whose `of` is no group, as the forge says it. */
-function noGroup(of: string): string {
-  return `The task has no group ${of}, so the save is refused. Pick runs by a group, all or the first run not passed.`;
-}
-
 /** What a run entry's `of` reads as in its picker. */
 function ofLabel(of: string): string {
   if (of === 'all') return 'all, every run';
@@ -66,30 +43,15 @@ function ofLabel(of: string): string {
 
 /**
  * The rows of a section, then each name `show` lists there that no row has,
- * called unknown once what can be shown is `known`: one another section has
- * a row for is said to belong there.
+ * so it can be turned off. The save says why it is refused.
  */
-function withUnknown(
-  rows: ShowRow[],
-  listed: string[],
-  known: boolean,
-  home: (name: string) => Section | undefined,
-): Listed[] {
+function withListed(rows: ShowRow[], listed: string[]): ShowRow[] {
   const named = new Set(rows.map((row) => row.name));
   return [
     ...rows,
     ...[...new Set(listed)]
       .filter((name) => !named.has(name))
-      .map((name): Listed => {
-        const belongs = home(name);
-        return {
-          name,
-          label: name,
-          ...(known
-            ? { unknown: belongs === undefined ? UNKNOWN : BELONGS[belongs](name) }
-            : {}),
-        };
-      }),
+      .map((name) => ({ name, label: name })),
   ];
 }
 
@@ -106,7 +68,6 @@ export function ShowPicker({
   saved,
   graded,
   disabled,
-  known,
   values,
   settings,
   outputs,
@@ -121,8 +82,6 @@ export function ShowPicker({
   /** A graded submission exists, so what was shown always has been seen. */
   graded: boolean;
   disabled: boolean;
-  /** Until the workflow's outputs are read, no name `show` lists is called unknown. */
-  known: boolean;
   values: ShowRow[];
   /** The task's settings, which every run shares. */
   settings: ShowRow[];
@@ -146,19 +105,8 @@ export function ShowPicker({
 
   const listedOf = (kind: ShowKind) =>
     MOMENTS.flatMap(({ value }) => show[value][kind]);
-  const sections: [Section, ShowRow[]][] = [
-    ['values', values],
-    ['inputs', settings],
-    ['outputs', outputs],
-    ['fields', fields],
-  ];
-  // The section other than `own` that has a row for the name, if one has.
-  const homeOf = (own: Section) => (name: string) =>
-    sections.find(
-      ([section, rows]) => section !== own && rows.some((row) => row.name === name),
-    )?.[0];
   const section = (kind: ShowKind, title: string, rows: ShowRow[], empty: string) => {
-    const all = withUnknown(rows, listedOf(kind), known, homeOf(kind));
+    const all = withListed(rows, listedOf(kind));
     return (
       <tbody key={kind}>
         <tr>
@@ -261,39 +209,32 @@ export function ShowPicker({
                         />
                       )}
                     </div>
-                    {!choices.includes(of) && (
-                      <BodyText size="sm" tone="secondary">
-                        {noGroup(of)}
-                      </BodyText>
-                    )}
                   </th>
                 </tr>
-                {withUnknown(fields, listedFields, known, homeOf('fields')).map(
-                  (row) => (
-                    <Row
-                      key={row.name}
-                      row={row}
-                      named={`${row.label} of ${of}`}
-                      moments={runMoments(show, of, row.name)}
-                      warn={
-                        graded &&
-                        hidesAlways(saved, show, {
-                          kind: 'runs',
-                          of,
-                          field: row.name,
-                          runs,
-                          groups,
-                        })
-                          ? SEEN
-                          : undefined
-                      }
-                      disabled={disabled}
-                      onToggle={(moment, on) =>
-                        onChange(withRunMoment(show, of, row.name, moment, on))
-                      }
-                    />
-                  ),
-                )}
+                {withListed(fields, listedFields).map((row) => (
+                  <Row
+                    key={row.name}
+                    row={row}
+                    named={`${row.label} of ${of}`}
+                    moments={runMoments(show, of, row.name)}
+                    warn={
+                      graded &&
+                      hidesAlways(saved, show, {
+                        kind: 'runs',
+                        of,
+                        field: row.name,
+                        runs,
+                        groups,
+                      })
+                        ? SEEN
+                        : undefined
+                    }
+                    disabled={disabled}
+                    onToggle={(moment, on) =>
+                      onChange(withRunMoment(show, of, row.name, moment, on))
+                    }
+                  />
+                ))}
               </tbody>
             );
           })}
@@ -331,7 +272,7 @@ function Row({
   disabled,
   onToggle,
 }: {
-  row: Listed;
+  row: ShowRow;
   /** What its boxes are called, when its label alone does not tell its section. */
   named?: string;
   moments: Moment[];
@@ -347,11 +288,6 @@ function Row({
         {row.refused !== undefined && (
           <BodyText size="sm" tone="secondary">
             {row.refused}
-          </BodyText>
-        )}
-        {row.unknown !== undefined && (
-          <BodyText size="sm" tone="secondary">
-            {row.unknown}
           </BodyText>
         )}
         {warn !== undefined && (

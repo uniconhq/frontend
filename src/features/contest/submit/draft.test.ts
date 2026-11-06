@@ -93,7 +93,7 @@ describe('the checks before anything is sent', () => {
     expect(checkDraft(inputs, full)).toBeNull();
   });
 
-  it('names every input that is empty, unchosen or out of range', () => {
+  it('names every input that is empty or unchosen, leaving a number’s bounds to the server', () => {
     const refused = checkDraft(inputs, {
       submission: { kind: 'files', files: [] },
       program: { kind: 'files', files: [] },
@@ -104,7 +104,6 @@ describe('the checks before anything is sent', () => {
     expect(refused?.extensions['errors']).toEqual([
       { input: 'submission', message: 'This input needs a file.' },
       { input: 'program', message: 'This input needs at least one file.' },
-      { input: 'alpha', message: 'This must be at most 1.' },
       { input: 'language', message: 'Choose one of c, cpp.' },
     ]);
   });
@@ -126,18 +125,6 @@ describe('the checks before anything is sent', () => {
         },
       ]);
     }
-  });
-
-  it('checks a number against bounds of 30 digits exactly', () => {
-    const ratio = inputField({ id: 'ratio', type: 'number', max: THIRTY });
-    const at = checkDraft([ratio], { ratio: { kind: 'text', text: THIRTY } });
-    const past = checkDraft([ratio], {
-      ratio: { kind: 'text', text: `${THIRTY.slice(0, -1)}2` },
-    });
-    expect(at).toBeNull();
-    expect(past?.extensions['errors']).toEqual([
-      { input: 'ratio', message: `This must be at most ${THIRTY}.` },
-    ]);
   });
 
   it('holds an input’s files together to its size, naming the input', () => {
@@ -293,12 +280,12 @@ describe('what a submit sends', () => {
         kind: 'parts',
         parts: [
           { kind: 'text', text: ' 4 ' },
-          { kind: 'text', text: '12' },
+          { kind: 'text', text: '1e3' },
         ],
       },
     };
     expect(checkDraft([seed], typed)?.extensions['errors']).toEqual([
-      { input: 'seed', message: 'Part 2: This must be at most 9.' },
+      { input: 'seed', message: 'Part 2: Give a number in plain digits, such as 2.5.' },
     ]);
     const fixed: Draft = {
       seed: {

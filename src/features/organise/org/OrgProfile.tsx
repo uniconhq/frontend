@@ -12,9 +12,8 @@ import classes from '../organise.module.css';
 import own from './org.module.css';
 
 const ORG = '/api/v1/orgs/{org}';
-/** The most the forge takes: a description of 255 characters, a full name of 100. */
+/** The most a description holds, said in its field. */
 const DESCRIPTION_MAX = 255;
-const DISPLAY_NAME_MAX = 100;
 
 type Profile = { display_name: string | null; description: string };
 
@@ -75,14 +74,12 @@ function EditForm({
         info="What people see in place of the org's name."
         value={displayName}
         onChange={setDisplayName}
-        maxLength={DISPLAY_NAME_MAX}
       />
       <TextInput
         label="Description"
         description={`At most ${String(DESCRIPTION_MAX)} characters.`}
         value={description}
         onChange={setDescription}
-        maxLength={DESCRIPTION_MAX}
       />
       {update.error !== null && (
         <div className={classes.panel} role="alert">

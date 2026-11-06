@@ -63,13 +63,7 @@ function Composer({
       onSubmit={(event) => void send(event)}
       aria-label={label}
     >
-      <TextInput
-        label="Title"
-        value={title}
-        onChange={setTitle}
-        maxLength={200}
-        required
-      />
+      <TextInput label="Title" value={title} onChange={setTitle} required />
       <Textarea label="Text" value={body} onChange={setBody} rows={4} required />
       {change.error !== null && <ErrorBlock error={change.error} compact />}
       <div className={classes.actions}>
