@@ -3,19 +3,10 @@ import type { paths } from './schema';
 import { apiErrorFromResponse, apiErrorFromTransportFailure } from './problem';
 import { serverClockMiddleware } from './server-clock';
 
-/**
- * The app is served from the same origin as the API, so every call is relative
- * and the session cookie rides along without CORS. Paths are passed exactly as
- * the OpenAPI document names them, so the base carries no prefix. It is the
- * current origin rather than an empty string because Node's fetch, which the
- * tests run on, refuses a relative URL.
- */
+// Same origin as the API. The full origin, not '', because Node's fetch refuses relative URLs.
 const baseUrl = typeof window === 'undefined' ? '' : window.location.origin;
 
-/**
- * Non-ok responses become ApiError, so React Query's `error` is always one
- * type, whether the body was a problem document or an HTML page from a proxy.
- */
+// Every failure becomes an ApiError, even a proxy's HTML page.
 const problemMiddleware: Middleware = {
   async onResponse({ response }) {
     if (response.ok) return response;

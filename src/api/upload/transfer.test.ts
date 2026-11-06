@@ -10,9 +10,7 @@ const DOOR = '/-/uploads/abc';
 
 describe('sending a file through the door', () => {
   it('puts the file itself, once, and reports it as sent', async () => {
-    // The request stand-in these tests run on does not carry a Blob's bytes,
-    // so what is checked here is that one PUT went to the slot's address and
-    // that progress reached the end; the end-to-end run sees the bytes.
+    // The test fetch carries no Blob bytes; the end-to-end run checks those.
     const methods: string[] = [];
     server.use(
       http.put(DOOR, ({ request }) => {
@@ -31,9 +29,6 @@ describe('sending a file through the door', () => {
   });
 
   it('fails whatever the forge says, since none of it is the sender’s to act on', async () => {
-    // The door refuses before it reads the body, and the forge refuses a body
-    // that is not what the address named. Either way the panel reads the
-    // upload back rather than showing what came out of the forge.
     for (const status of [403, 422, 500]) {
       server.use(http.put(DOOR, () => new HttpResponse('<Error/>', { status })));
 
@@ -76,8 +71,7 @@ describe('a stalled upload', () => {
   ])(
     'waits $limit ms for the $name answer after the last byte',
     async ({ send, limit }) => {
-      // A request whose body is all sent and whose answer never comes: the
-      // stand-in msw gives says nothing of the body going, so this one does.
+      // msw reports no upload progress, so this stand-in does.
       class Sent {
         readonly upload: {
           onprogress?: (event: { loaded: number }) => void;
@@ -113,9 +107,6 @@ describe('a stalled upload', () => {
 
 describe('working out what a file hashes to', () => {
   it('reads it in slices and never holds it whole', async () => {
-    // Four slices of eight megabytes would be read for a file this size were
-    // it larger; what matters here is that the answer is the file's SHA-256
-    // and that progress reaches the end.
     const content = 'print(1)\n';
     const shares: number[] = [];
 

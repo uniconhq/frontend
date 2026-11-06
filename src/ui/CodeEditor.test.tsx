@@ -16,7 +16,6 @@ function viewOf(label: string): EditorView {
   return view;
 }
 
-/** An edit as the person would make it, at the end of the text. */
 function typeAtEnd(view: EditorView, text: string) {
   const end = view.state.doc.length;
   view.dispatch({ changes: { from: end, insert: text }, userEvent: 'input.type' });

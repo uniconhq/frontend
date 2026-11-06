@@ -4,17 +4,8 @@ import { Button } from './Button';
 import classes from './ActionMenu.module.css';
 
 /**
- * A menu of actions behind a button: headings, dividers and items, an item
- * that cannot be chosen shown with the reason it cannot. The workflow
- * editor's ports use it, behind
- * a small plain button, as the keyboard's way to do what a drag does; a
- * step's drawer uses it behind a page's button (`button`).
- *
- * `entries` may be a function, called only while the menu is open: a graph
- * draws a menu on every port, and building every one's entries, and drawing
- * every menu again, on each change made the editor slow. A menu whose
- * entries are a function is drawn again only when its button's words change
- * or it opens, and reads the entries as they are then.
+ * `entries` may be a function, called only while the menu is open: a graph has
+ * a menu on every port, and building them all on each change is slow.
  */
 export type MenuEntry =
   | { kind: 'heading'; text: string }
@@ -27,7 +18,6 @@ export type MenuEntry =
   | { kind: 'divider' };
 
 type Props = {
-  /** What the button shows. */
   text: string;
   className?: string;
   /** What the button and the menu are called for a screen reader. */
@@ -38,8 +28,7 @@ type Props = {
 };
 
 export function ActionMenu({ entries, ...rest }: Props) {
-  // The latest entries, read when the menu opens, so a menu drawn once
-  // still offers what holds now.
+  // Read when the menu opens, so a menu drawn once still offers what holds now.
   const latest = useRef(entries);
   useLayoutEffect(() => {
     latest.current = entries;

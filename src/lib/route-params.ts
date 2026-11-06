@@ -1,10 +1,6 @@
 import { useParams } from 'react-router';
 
-/**
- * The scope a page is about, from its route. The route table guarantees each
- * one is there, so a missing one is a wiring mistake and throws rather than
- * rendering a page about nothing.
- */
+/** A missing param is a wiring mistake in the route table, so it throws. */
 function required(value: string | undefined, name: string): string {
   if (value === undefined || value === '') {
     throw new Error(`the route has no :${name} parameter`);

@@ -28,9 +28,8 @@ function languageExtension(language: CodeLanguage): Extension {
 }
 
 /**
- * The editor's colours are the theme's own, as CSS variables, so it follows
- * the colour scheme without being built again; CodeMirror's default
- * highlighting is drawn for a light page and fades on the dark one.
+ * Theme CSS variables, so it follows the colour scheme without a rebuild;
+ * CodeMirror's default highlighting fades on a dark page.
  */
 const look = EditorView.theme({
   '&': {
@@ -95,7 +94,7 @@ const highlighting = HighlightStyle.define([
 /** Marks a change that came from `value` rather than from the person typing. */
 const fromValue = Annotation.define<boolean>();
 
-/** A run of lines, first to last, counted from 1. */
+/** Counted from 1. */
 export type LineRange = { from: number; to: number };
 
 const markLines = StateEffect.define<LineRange[]>();
@@ -130,20 +129,11 @@ const markedLines = StateField.define<DecorationSet>({
 });
 
 /**
- * A code editor: CodeMirror with its basic setup (line numbers, undo, search,
- * bracket matching, the keyboard commands people expect), highlighting YAML
- * or Markdown when told the text is one. It is controlled like a field:
- * `value` is the text, and every edit the person makes comes back through
- * `onChange`; a new `value` from outside replaces the text without coming
- * back, and outside the undo history. `readOnly` keeps the text as it is but
- * still lets it be read, selected and copied. `marked` draws a band behind
- * the lines it names, scrolling the first into view. The label is shown above it and
- * is the editing area's accessible name, and clicking it moves the focus in.
- * It is `rows` lines tall and the person can drag it taller.
+ * Controlled like a field: a new `value` from outside replaces the text without
+ * calling `onChange` and outside the undo history.
  *
- * Tests run under jsdom, which has no layout for CodeMirror to measure, so
- * the test setup stands a plain text field in for this component, with the
- * same props; `CodeEditor.test.tsx` covers this one itself.
+ * jsdom has no layout for CodeMirror, so the test setup stands a text field in
+ * for this; `CodeEditor.test.tsx` covers the real one.
  */
 export function CodeEditor({
   label,

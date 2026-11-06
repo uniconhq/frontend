@@ -4,7 +4,6 @@
   gap: 16px;
 }
 
-/* A group of related fields, under a small heading. */
 .fieldset {
   display: flex;
   flex-direction: column;
@@ -15,10 +14,7 @@
   border-radius: var(--mantine-radius-sm);
 }
 
-/*
- * A field alone on its line is as wide as a field needs, not the page; fields
- * side by side share a grid instead.
- */
+/* A lone field is as wide as it needs, not the page. */
 .fieldset > :global(.mantine-InputWrapper-root),
 .fieldset > div:not(.grid):has(> :global(.mantine-InputWrapper-root)) {
   max-width: 640px;
@@ -31,7 +27,6 @@
   color: var(--unicon-text-primary);
 }
 
-/* Fields side by side where there is room, one under the other on a phone. */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -65,7 +60,6 @@
   overflow-wrap: anywhere;
 }
 
-/* The statement's source beside what contestants see. */
 .split {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -90,7 +84,7 @@
   margin: 0;
 }
 
-/* What a save was refused for, said where a field-level error cannot go. */
+/* A refusal no field can show. */
 .refused {
   margin: 0;
   font-size: 12px;

@@ -5,11 +5,7 @@ import { Loaded } from '@/ui/feedback/Loaded';
 import { useOrganisersLine } from '../people/summary';
 import type { RolePlace } from '../roles';
 
-/**
- * A hub card's line once its read is in, with the one loading and failure
- * pattern a card has: a grey line, then the words, or the failure and a
- * retry.
- */
+/** A hub card's line, with the one loading and failure pattern cards share. */
 export function Line<T>({
   view,
   say,
@@ -24,7 +20,6 @@ export function Line<T>({
   );
 }
 
-/** How many announcements there are, and the latest one's title. */
 export function AnnouncementsLine({ view }: { view: QueryView<{ title: string }[]> }) {
   return (
     <Line
@@ -39,7 +34,6 @@ export function AnnouncementsLine({ view }: { view: QueryView<{ title: string }[
   );
 }
 
-/** How many organise a place, and how many invites to join them are pending. */
 export function OrganisersLine({ place }: { place: RolePlace }) {
   return <Line view={useOrganisersLine(place)} say={(line) => line} />;
 }

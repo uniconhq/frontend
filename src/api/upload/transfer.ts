@@ -1,20 +1,12 @@
 import { ApiError, isApiError } from '@/api/problem';
 
 /**
- * How long a file may send nothing before it counts as stalled. A stall is
- * either the door refusing before it reads the body, which the browser often
- * sees only as the body no longer being read, or a connection that died
- * without saying so. The two look alike from here, so a stall counts as cut:
- * the sender asks where the upload stands before sending again, and a refused
- * slot answers that with its own refusal.
+ * A door refusing early and a silently dead connection look alike, so a stall
+ * counts as cut; the sender then asks where the upload stands.
  */
 const STALL_MS = 30_000;
 
-/**
- * How long the answer may take once the last byte has gone: the forge
- * finishes writing the file to its store before it answers, which for a
- * large file under load can take minutes. The proxy waits as long.
- */
+// The forge stores the file before answering, which can take minutes. The proxy waits as long.
 const ANSWER_MS = 300_000;
 
 function failed(cut = false): ApiError {
@@ -26,43 +18,22 @@ function failed(cut = false): ApiError {
   });
 }
 
-/**
- * Whether a send failed because the connection broke or stalled, rather than
- * because the door or the forge answered it with a refusal: only then is
- * sending the same file again from the start worth doing.
- */
+/** Broke or stalled, not refused: only then is sending again worth it. */
 export function wasCut(error: unknown): boolean {
   return (
     isApiError(error) && error.code === 'upload_failed' && error.extensions.cut === true
   );
 }
 
-/**
- * The slot's address on this origin. The door is a path on the app's own
- * host, so the session cookie goes with the request and there is no CORS; in
- * development it goes through the dev server's proxy like `/api` does.
- */
+// Same origin, so the cookie goes along and dev uses the dev server's proxy.
 function onThisOrigin(url: string): string {
   const target = new URL(url, window.location.href);
   return `${target.pathname}${target.search}`;
 }
 
 /**
- * Sends `file` to the address its slot names, reporting the share of it sent,
- * from 0 to 1.
- *
- * One PUT of the file itself. `XMLHttpRequest` rather than `fetch` because it
- * streams the file from disk and reports how much has gone, which `fetch`
- * does not; the browser never holds the file in memory either way.
- *
- * The forge hashes the body as it stores it and keeps nothing that is not the
- * digest and length the address names, so a file that changed since it was
- * read is refused there. Every refusal fails this the same way: what the
- * forge says about it is not something the sender can use, and where the
- * upload stands is read back from the platform afterwards. A broken or
- * stalled connection fails it too, marked so `wasCut` tells it apart: the
- * forge keeps nothing of a body that did not finish, so the same PUT can be
- * sent again from the start.
+ * `XMLHttpRequest`, not `fetch`, for upload progress. Every refusal fails the
+ * same way; where the upload stands is read back afterwards.
  */
 export async function sendToForge(
   url: string,

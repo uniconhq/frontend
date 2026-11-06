@@ -4,13 +4,7 @@ import {
   type UserEvent,
 } from '@testing-library/user-event';
 
-/**
- * user-event as the tests use it, with no pause between one key or click and
- * the next. The library pauses with a zero-length timeout by default, which
- * Windows runs no sooner than its clock tick of about 15 ms, so each key typed
- * or tabbed cost a test that long. Nothing else changes: each direct call
- * still makes a user of its own, as the library's do.
- */
+// No pause between keys: the default zero timeout costs about 15 ms per key on Windows.
 const NO_PAUSE = { delay: null } satisfies Options;
 
 const userEvent = {

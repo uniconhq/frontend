@@ -1,20 +1,12 @@
-/**
- * The API serves every value and reported number exactly, as a string of
- * plain decimal digits, so nothing is lost to a float on the way. They are
- * rounded only here, for display, and compared as the digits they are.
- */
+// The API sends numbers as decimal strings so no float loses digits; they are
+// rounded only here, for display.
 
 const DECIMAL = /^([-+]?)(\d*)(?:\.(\d*))?(?:[eE]([-+]?\d+))?$/;
-/** A whole number in hex or octal, as YAML 1.2's core schema writes one. */
+/** Hex or octal, as YAML 1.2's core schema writes one. */
 const BASED = /^0x[0-9a-fA-F]+$|^0o[0-7]+$/;
-/**
- * The largest power of ten a decimal is worked with at: past it, its digits
- * would take ever longer to build, while no number the format holds comes
- * near it.
- */
+/** A cap so a huge exponent cannot take ages to build; no real number nears it. */
 const MOST_POWER = 1000;
 
-/** A decimal as a whole number of units and the power of ten of a unit. */
 function scaled(text: string): { units: bigint; power: number } | null {
   const trimmed = text.trim();
   if (BASED.test(trimmed)) return { units: BigInt(trimmed), power: 0 };
@@ -30,14 +22,7 @@ function scaled(text: string): { units: bigint; power: number } | null {
   };
 }
 
-/**
- * How two decimals written as text compare, digit for digit, however many
- * digits they have and whatever way each is spelled (`2.5`, `2.50`,
- * `25e-1`, and a whole number as `0x19` or `0o31`, which a definition file
- * may hold): below zero when `a` is less, zero when they are the same
- * number, above zero when `a` is more. Text that is no decimal compares as
- * NaN.
- */
+/** Compares exactly, whatever the spelling (`2.50`, `25e-1`, `0x19`); NaN for non-numbers. */
 export function compareDecimal(a: string, b: string): number {
   const left = scaled(a);
   const right = scaled(b);
@@ -48,15 +33,10 @@ export function compareDecimal(a: string, b: string): number {
   return x < y ? -1 : x > y ? 1 : 0;
 }
 
-/** An exact fraction of two whole numbers, its denominator above zero. */
+/** `den` is above zero. */
 export type Ratio = { num: bigint; den: bigint };
 
-/**
- * A fraction as plain decimal digits, rounded half away from zero, or cut
- * toward zero, to at most `decimals` decimals, and whether that is the
- * fraction exactly: `1/4` is `0.25` exactly, `100/3` is `33.33` and not
- * exact, `200/3` is `66.67` rounded and `66.66` cut.
- */
+/** Rounds half away from zero, or cuts toward zero: `200/3` is `66.67` or `66.66`. */
 export function ratioDigits(
   value: Ratio,
   decimals = 2,
@@ -78,7 +58,6 @@ export function ratioDigits(
   };
 }
 
-/** The digits of an exact number split at its point, its sign apart. */
 type Parts = { negative: boolean; whole: string; fraction: string };
 
 function partsOf(exact: string): Parts {
@@ -87,10 +66,7 @@ function partsOf(exact: string): Parts {
   return { negative, whole, fraction };
 }
 
-/**
- * `exact` rounded half away from zero to at most `decimals` decimals, with
- * trailing zeros dropped, still as plain digits: `"2.675"` to 2 is `"2.68"`.
- */
+/** Half away from zero, trailing zeros dropped: `"2.675"` to 2 is `"2.68"`. */
 export function rounded(exact: string, decimals: number): string {
   const { negative, whole, fraction } = partsOf(exact);
   if (fraction.length <= decimals) {
@@ -112,12 +88,7 @@ const locale = new Intl.NumberFormat();
 const decimalSign =
   locale.formatToParts(0.5).find((part) => part.type === 'decimal')?.value ?? '.';
 
-/**
- * `exact` for reading, rounded to at most `decimals` decimals and written the
- * way the reader's locale writes numbers. Its whole part is grouped as an
- * integer and its decimals kept as digits, so a number past what a float
- * holds is shown whole.
- */
+/** In the reader's locale, grouped as a BigInt so a number past a float shows whole. */
 export function formatExact(exact: string, decimals = 4): string {
   const { negative, whole, fraction } = partsOf(rounded(exact, decimals));
   const grouped = locale.format(BigInt(whole));

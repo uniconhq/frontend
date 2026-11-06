@@ -1,11 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-/**
- * A session can end while a page is open: it expires, someone revokes it, or
- * refreshing the Forgejo token fails. The page and its drafts stay mounted and
- * one modal says so. `armed` is what stops the modal appearing at boot, when a
- * signed-out visitor's first GET /me answers 401.
- */
+// `armed` stops the modal at boot, when a signed-out visitor's GET /me answers 401.
 let armed = false;
 let open = false;
 const listeners = new Set<() => void>();
@@ -23,12 +18,10 @@ export function isSessionExpired(): boolean {
   return open;
 }
 
-/** Whether the session ended while the page was open, kept up to date. */
 export function useSessionExpired(): boolean {
   return useSyncExternalStore(subscribe, isSessionExpired, () => false);
 }
 
-/** Called by the session provider: true once a person is known to be signed in. */
 export function armSessionExpiry(signedIn: boolean): void {
   armed = signedIn;
   if (!signedIn && open) {
@@ -37,7 +30,6 @@ export function armSessionExpiry(signedIn: boolean): void {
   }
 }
 
-/** Called for every 401 the app sees. Opens the modal at most once. */
 export function reportUnauthenticated(): void {
   if (!armed || open) return;
   open = true;

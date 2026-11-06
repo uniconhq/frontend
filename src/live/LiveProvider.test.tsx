@@ -175,8 +175,7 @@ describe('where the live stream stands', () => {
     vi.useFakeTimers();
     try {
       const client = new QueryClient();
-      // Every read a nudge could reach, as the client names it: the route's
-      // own template from openapi.json.
+      // Keys use the route templates from openapi.json.
       const org = '/api/v1/orgs/{org}';
       const contest = `${org}/contests/{contest}`;
       const task = `${contest}/tasks/{task}`;
@@ -293,8 +292,6 @@ describe('where the live stream stands', () => {
       const client = new QueryClient();
       const contest = '/api/v1/orgs/{org}/contests/{contest}';
       const task = `${contest}/tasks/{task}`;
-      // Every read marked EDITED, under the keys the forms and the task's
-      // build cards give them.
       const edited = [
         ['get', `${contest}/files/{path}`, 'own'],
         ['get', `${task}/files/{path}`, 'own'],

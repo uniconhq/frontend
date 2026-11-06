@@ -47,7 +47,7 @@
   color: var(--unicon-text-secondary);
 }
 
-/* Out of sight and still in the tab order, the way screen-reader-only text is hidden. */
+/* Hidden but still in the tab order. */
 .input {
   position: absolute;
   width: 1px;
@@ -88,7 +88,7 @@
   max-width: 240px;
 }
 
-/* The way to choose a whole folder: a helper line, underlined so it reads as one to click. */
+/* Underlined so it reads as something to click. */
 .folder {
   position: relative;
   align-self: flex-start;

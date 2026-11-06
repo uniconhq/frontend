@@ -1,9 +1,6 @@
 import { Avatar as MantineAvatar } from '@mantine/core';
 
-/**
- * Forgejo serves the image; when it does not, the initial stands in. Never a
- * broken-image icon next to someone's name.
- */
+/** Shows the initial when Forgejo has no image, never a broken-image icon. */
 export function Avatar({
   src,
   name,

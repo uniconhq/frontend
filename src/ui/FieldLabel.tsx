@@ -4,11 +4,8 @@ import { InfoTip } from './InfoTip';
 import classes from './FieldLabel.module.css';
 
 /**
- * A field's label with its ⓘ beside it, for a field that has background to
- * give. The ⓘ sits beside the label rather than inside it, so the field is
- * still named by its label alone, and clicking the ⓘ opens it rather than
- * moving to the box. Without `info` the field keeps Mantine's own label, and
- * this adds nothing.
+ * The ⓘ sits beside the label, not inside it, so the field is named by its
+ * label alone and clicking the ⓘ does not move to the box.
  */
 export function useFieldLabel({
   label,

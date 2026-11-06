@@ -1,10 +1,6 @@
 import { Skeleton, Stack } from '@mantine/core';
 
-/**
- * Shaped like the content it replaces, so the page does not jump when the data
- * lands. Never a full-page spinner after boot. Announced as loading, so a
- * screen reader hears something rather than silence.
- */
+/** Shaped like the content it replaces, so the page does not jump when data lands. */
 export function PageSkeleton({ rows = 3 }: { rows?: number }) {
   return (
     <Stack gap="sm" py="md" role="status" aria-label="Loading">

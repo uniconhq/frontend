@@ -4,10 +4,8 @@ import classes from './Chip.module.css';
 export type ChipTone = 'quiet' | 'live' | 'warn';
 
 /**
- * One word about where a thing stands, such as Draft or Running, beside its
- * name. `live` is for what is under way now or open to everyone, such as
- * a public workflow, `warn` for what needs an organiser, and `quiet` for
- * the rest.
+ * `live` is for what is under way or open to everyone, `warn` for what needs
+ * an organiser, and `quiet` for the rest.
  */
 export function Chip({
   children,

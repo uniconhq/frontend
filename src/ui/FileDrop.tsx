@@ -4,20 +4,8 @@ import { Progress } from './Progress';
 import classes from './FileDrop.module.css';
 
 /**
- * A place to drop files or choose them. It is the browser's own file input,
- * hidden but not taken out of the tab order, inside the zone that shows it, so
- * a keyboard reaches it with Tab and opens the picker with Enter or Space, a
- * click anywhere on the zone does the same, and a screen reader hears it by
- * `label`. `accept` is the input's own attribute, which only narrows what the
- * picker shows: a dropped file is not held to it here.
- *
- * A single-file zone replaces its file; a `multiple` one adds to its files,
- * one at the same path replacing the one there. A `folder` zone takes
- * several files too, and offers a second picker under it that chooses a
- * whole folder, its own file input, labelled `<label>: a folder`. Each file
- * is known by `pathOf`, its name unless told otherwise. The files chosen are
- * listed below the zone by that path, each with a way to take it out and,
- * while `progressOf` gives one, how much of it has been sent.
+ * The browser's own file input, hidden but kept in the tab order, so Tab and
+ * Enter reach the picker. `accept` only narrows the picker: a dropped file is not held to it.
  */
 export function FileDrop({
   label,

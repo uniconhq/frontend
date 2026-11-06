@@ -2,10 +2,8 @@ import { useMantineTheme } from '@mantine/core';
 import { UniconMark } from './UniconMark';
 
 /**
- * Mark at the x-height of the wordmark, baseline-aligned, with the handoff's
- * ratios from theme.other.lockup. Below a 16px wordmark the mark becomes a
- * sliver, so use <UniconMark> alone. Inline styles because the sizes are
- * computed from the one `size` prop.
+ * Below a 16px wordmark the mark becomes a sliver, so use <UniconMark> alone.
+ * Inline styles because the sizes come from the one `size` prop.
  */
 export function UniconLockup({
   size = 40,

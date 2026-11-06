@@ -1,7 +1,6 @@
 import { Paper } from '@mantine/core';
 import type { ReactNode } from 'react';
 
-/** A panel: body surface, 1px border, 8px radius, 16px padding. No shadow. */
 export function Card({ children }: { children: ReactNode }) {
   return (
     <Paper

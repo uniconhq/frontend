@@ -29,11 +29,7 @@
   width: 220px;
 }
 
-/*
- * As tall as its rows, up to about six two-line ones, scrolling inside past
- * that. Once it cannot scroll further the wheel moves the page, so it never
- * holds the page still.
- */
+/* Scrolls past about six rows; at its end the wheel moves the page. */
 .rows {
   max-height: 336px;
   overflow-y: auto;
@@ -126,7 +122,6 @@
   padding-right: 80px;
 }
 
-/* The card's one button, at its bottom. */
 .action {
   display: flex;
   padding-top: 10px;

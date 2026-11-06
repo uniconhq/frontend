@@ -1,6 +1,5 @@
 import { Checkbox as MantineCheckbox } from '@mantine/core';
 
-/** A yes or no, with its label beside the box and clickable with it. */
 export function Checkbox({
   label,
   checked,

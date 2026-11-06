@@ -6,16 +6,8 @@ import { useSession } from './session-context';
 import { currentPath } from './login-href';
 
 /**
- * A layout route: everything nested under it needs a session. `next` carries
- * the whole address, search and hash included, so a pasted link still lands
- * where it pointed after the detour through Forgejo.
- *
- * The guard answers one question, once: did this person arrive with a session.
- * A session that goes away while the page is open belongs to the
- * expired-session modal, which keeps the page and everything typed into it. A
- * backend that would not say who you are is not a redirect either: sending
- * someone to /login because /me answered 503 asks them to sign in through the
- * service that is down.
+ * Checks once, on arrival. A session lost later is the expired modal's job,
+ * and a down backend shows an error, not a sign-in that can't work.
  */
 export function RequireSession() {
   const session = useSession();

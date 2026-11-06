@@ -1,11 +1,7 @@
 import type { Middleware } from 'openapi-fetch';
 import { recordServerTime } from '@/lib/time';
 
-/**
- * The clock offset is measured where the request happens, not where its answer
- * is rendered: a component reading a cached `now` would measure however long
- * that answer sat in the query cache. Only GET /api/v1/time is timed.
- */
+// Timed at the request, not at render: a cached `now` would count its time in the cache.
 const TIME_PATH = '/api/v1/time';
 
 const startedAt = new WeakMap<Request, number>();

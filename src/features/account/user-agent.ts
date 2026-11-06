@@ -1,8 +1,4 @@
-/**
- * A session row has to be recognisable: is that me on my laptop, or someone
- * else? This is the smallest thing that answers the question. It is not browser
- * detection, and nothing branches on it.
- */
+// Only a label for a session row; nothing branches on it.
 const BROWSERS: [string, RegExp][] = [
   ['Edge', /Edg\//],
   ['Opera', /OPR\//],

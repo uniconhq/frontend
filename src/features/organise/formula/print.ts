@@ -47,11 +47,7 @@ function isRecord(tree: Tree): tree is RecordTree {
   return typeof tree === 'object' && tree !== null;
 }
 
-/**
- * A block tree as a line. Brackets come back only where the nesting would
- * otherwise flatten, a fold's `over` and `of` print as `group.column`, and
- * a name's `-` prints as `_`, as a formula reads it.
- */
+/** Brackets come back only where the nesting would otherwise flatten. */
 export function printFormula(tree: Tree, catalogue: Catalogue, where: Where): string {
   return print(tree, 0, false, catalogue, where);
 }
@@ -72,10 +68,7 @@ function print(
   return printMap(tree, catalogue, where);
 }
 
-/**
- * A record as a map, `{key: value, ...}`, each key bare when it reads as
- * itself. `deep`, as weights are, prints a record in it as a map too.
- */
+/** `deep`, as for weights, prints a nested record as a map too. */
 function printMap(
   tree: RecordTree,
   catalogue: Catalogue,
@@ -98,15 +91,11 @@ function printMap(
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const NUMBER = /^\d+(\.\d+)?$/;
 
-/** `text` as a formula writes a text: in quotes, each `"` and `\\` escaped. */
 function quoted(text: string): string {
   return `"${text.replace(/[\\"]/g, (char) => `\\${char}`)}"`;
 }
 
-/**
- * The keys a one-entry record reads as a leaf by, so a map keyed by one of
- * them, such as weights on a group called `name`, writes the key quoted.
- */
+/** A map key that is also a leaf key, such as `name`, is written quoted. */
 const LEAF_KEYS = new Set([
   'text',
   'value',
@@ -118,7 +107,6 @@ const LEAF_KEYS = new Set([
   'run',
 ]);
 
-/** Whether a formula reads `text` written bare as that name. */
 function bare(text: string): boolean {
   return NAME.test(text) && text !== 'and' && text !== 'or' && text !== 'not';
 }
@@ -174,16 +162,14 @@ function printCall(
   if (typeof block !== 'string') return '';
   const symbol = SYMBOL[block];
   const of = tree.of;
-  // `0 - x` is how a line's `-x` is stored, so it prints back as `-x`, which
-  // binds tighter than any operator.
+  // A line's `-x` is stored as `0 - x`.
   if (block === 'sub' && Array.isArray(of) && of.length === 2 && of[0] === '0')
     return `-${print(of[1] ?? null, UNARY, false, catalogue, where)}`;
   if (symbol !== undefined && Array.isArray(of)) {
     const prec = PREC[block] ?? 0;
     const text = of
       .map((child, index) => {
-        // A chain is one block of many inputs, so the same block nested in
-        // one keeps its brackets, or it would read back flattened.
+        // The same chain block nested keeps its brackets, or it reads back flattened.
         const nested =
           CHAINS.has(block) &&
           typeof child === 'object' &&
@@ -192,8 +178,7 @@ function printCall(
         return print(child, nested ? prec + 1 : prec, index > 0, catalogue, where);
       })
       .join(` ${symbol} `);
-    // A comparison reads one at most, so one inside another keeps brackets;
-    // otherwise a left input of the same precedence needs none.
+    // Comparisons don't chain, so a nested one keeps its brackets.
     const bracket = parent > prec || (parent === prec && (right || prec === COMPARE));
     return bracket ? `(${text})` : text;
   }
@@ -239,7 +224,6 @@ function argumentsOf(
       continue;
     }
     const kind = form?.inputs[key]?.kind;
-    // A program or a language is plain text: quoted unless it reads as a name.
     const plain =
       (kind === 'path' || kind === 'language') && typeof value === 'string'
         ? bare(value)
@@ -258,8 +242,7 @@ function argumentsOf(
       (Array.isArray(value)
         ? value.map((child) => print(child, 0, false, catalogue, where)).join(', ')
         : print(value, 0, false, catalogue, where));
-    // A bound or a limit, a number written out, is named, so
-    // `entered(at_least: 0, at_most: 1)` says which is which.
+    // Plain inputs are named: `entered(at_least: 0, at_most: 1)`.
     const named = gap || form?.inputs[key]?.plain === true;
     parts.push(named ? `${key}: ${text}` : text);
   }

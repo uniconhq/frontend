@@ -2,9 +2,8 @@ import type { QueryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
 
 /**
- * What the grading queue says for a task with no publication, which the
- * forge answers with a 404: nothing can be graded on it, so nothing waits
- * for a mark, and the page is not missing.
+ * The forge answers the queue with a 404 for a task with no publication;
+ * that means nothing to mark, not a missing page.
  */
 export const UNPUBLISHED = 'Nothing to mark until the task is published.';
 
