@@ -40,10 +40,14 @@ export async function filesUnder(
   return found.flat();
 }
 
-/** One file the save writes: typed text, or a file's bytes; or one it removes. */
+/**
+ * One file the save writes: typed text, a file's bytes, or a file the upload
+ * door already holds, by its upload id and with its size; or one it removes.
+ */
 export type PlannedChange =
   | { path: string; token: string | null; text: string }
   | { path: string; token: string | null; source: Source }
+  | { path: string; token: string | null; upload: string; size: number }
   | { path: string; token: string; remove: true };
 
 /** A file's bytes as base64, the way a save carries a file that is not text. */
@@ -62,8 +66,8 @@ const INLINE_TOTAL = 4 * 1024 * 1024;
 
 /**
  * The planned changes as the save's changes: text as it is, a small file's
- * bytes inside the save, a larger one by the upload `upload` gives for it,
- * and a removal by its token.
+ * bytes inside the save, a larger one by the upload `upload` gives for it, a
+ * stored upload by its id, and a removal by its token.
  */
 export async function fileChanges(
   planned: PlannedChange[],
@@ -84,6 +88,14 @@ export async function fileChanges(
         path: change.path,
         token: change.token,
         content: change.text,
+        encoding: 'utf-8',
+        remove: false,
+      });
+    } else if ('upload' in change) {
+      changes.push({
+        path: change.path,
+        token: change.token,
+        upload: change.upload,
         encoding: 'utf-8',
         remove: false,
       });

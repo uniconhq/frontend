@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import type { DeclaredInput } from '@/api/types';
 import { problem, server } from '@/test/server';
 import { TASK_API } from '@/test/organiser';
-import { stageInputFiles } from './input-files';
+import { stageInputFiles, uploadFits } from './input-files';
 
 const PLACE = { kind: 'task', org: 'acme', contest: 'spring', task: 'sum' } as const;
 
@@ -94,5 +94,18 @@ describe('a file chosen for a setting', () => {
     expect(file.planned.map((change) => change.path)).toEqual([
       'inputs/public/checker.cpp',
     ]);
+  });
+});
+
+describe('an upload a setting would write', () => {
+  it('is a file right in a file setting’s own folder, and never one for a folder setting', () => {
+    const checker = declared('checker', 'file');
+    expect(uploadFits(checker, 'checker/big.bin')).toBe(true);
+    expect(uploadFits(checker, 'checker/deep/big.bin')).toBe(false);
+    expect(uploadFits(checker, 'checker/')).toBe(false);
+    expect(uploadFits(checker, 'checkers/big.bin')).toBe(false);
+    expect(uploadFits(declared('tests', 'file'), 'inputs/tests/big.bin')).toBe(true);
+    expect(uploadFits(declared('tests', 'file'), 'tests/big.bin')).toBe(false);
+    expect(uploadFits(declared('data', 'folder'), 'data/big.bin')).toBe(false);
   });
 });

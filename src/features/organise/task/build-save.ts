@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { toApiError } from '@/api/problem';
 import type { SaveRequest, SaveResult } from '@/api/types';
+import { partUploadsQuery } from '@/api/upload/parts';
 import type { Outcome } from '../files/SaveOutcome';
 import { fileQuery, staleAfterWrite } from '../files/place';
 import { sendToTask, tokenNow } from '../files/use-task-upload';
@@ -117,6 +118,8 @@ export function useTaskSave(place: TaskPlace, onSaved: () => Promise<void> | voi
     await Promise.all(
       [
         ...staleAfterWrite(place),
+        // A stored upload the save wrote is no longer open.
+        partUploadsQuery(place).queryKey,
         ...body.changes.map((change) => fileQuery(place, change.path).queryKey),
       ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     );

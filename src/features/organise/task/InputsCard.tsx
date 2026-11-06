@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { DeclaredInput } from '@/api/types';
+import type { PartTransfer } from '@/api/upload/parts';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
@@ -42,12 +43,13 @@ type Change = (change: Partial<InputValues>) => void;
 /**
  * What a setting that is a file or a folder is chosen with (M51): the task,
  * the files chosen for settings and waiting for the save, and what choosing
- * and undoing do.
+ * a file, choosing a stored upload and undoing do.
  */
 export type InputFiles = {
   place: TaskPlace;
   staged: StagedInput[];
   onChoose: (declared: DeclaredInput, files: File[], was: string) => void;
+  onUseUpload: (declared: DeclaredInput, upload: PartTransfer, was: string) => void;
   onUndo: (id: string) => void;
 };
 
@@ -119,6 +121,7 @@ function ValueField({
         staged={files.staged.find((each) => each.id === declared.id)}
         hint={hint}
         onChoose={(chosen) => files.onChoose(declared, chosen, input.value)}
+        onUseUpload={(upload) => files.onUseUpload(declared, upload, input.value)}
         onUndo={() => files.onUndo(declared.id)}
         onClear={declared.optional ? () => onChange({ value: '' }) : null}
         disabled={disabled}

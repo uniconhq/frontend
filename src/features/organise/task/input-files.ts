@@ -1,7 +1,7 @@
 import type { DeclaredInput } from '@/api/types';
 import { formatSize } from '@/lib/size';
 import { tokenNow } from '../files/use-task-upload';
-import type { TaskPlace } from './build-data';
+import { lastPart, type TaskPlace } from './build-data';
 import { filesUnder, type PlannedChange, type Source } from './staged';
 
 /**
@@ -53,6 +53,21 @@ function insideFolder(file: File): string {
 }
 
 /**
+ * The file or files a setting named before, with their tokens, when they
+ * were under its own folder `home`; none when they were elsewhere.
+ */
+async function ownBefore(
+  place: TaskPlace,
+  home: string,
+  was: string,
+): Promise<{ path: string; token: string }[]> {
+  if (!was.startsWith(`${home}/`)) return [];
+  if (was.endsWith('/')) return filesUnder(place, was.slice(0, -1));
+  const token = await tokenNow(place, was);
+  return token === null ? [] : [{ path: was, token }];
+}
+
+/**
  * The files chosen for an input as one change of the save: each written at
  * `<own folder>/<name>`, with the token of a file already there, and what the
  * setting named before taken out when it was under that folder and is not
@@ -72,15 +87,7 @@ export async function stageInputFiles(
     source: sourceOf(file),
   }));
   const value = folder ? `${home}/` : (chosen[0]?.path ?? '');
-  const own = was.startsWith(`${home}/`);
-  const before = !own
-    ? []
-    : was.endsWith('/')
-      ? await filesUnder(place, was.slice(0, -1))
-      : await (async () => {
-          const token = await tokenNow(place, was);
-          return token === null ? [] : [{ path: was, token, size: null }];
-        })();
+  const before = await ownBefore(place, home, was);
   const planned: PlannedChange[] = [];
   for (const file of chosen) {
     const known = before.find((old) => old.path === file.path);
@@ -105,6 +112,53 @@ export async function stageInputFiles(
       files.length === 1 && !folder
         ? `${files[0]?.name ?? ''}, ${formatSize(size)}`
         : `${String(files.length)} ${files.length === 1 ? 'file' : 'files'}, ${formatSize(size)}`,
+  };
+}
+
+/**
+ * Whether an upload's path is one a file setting would write: a file right
+ * in the setting's own folder, as a file chosen for it is saved. A folder
+ * setting takes no single upload.
+ */
+export function uploadFits(declared: DeclaredInput, path: string): boolean {
+  const home = `${ownFolder(declared.id)}/`;
+  const name = path.startsWith(home) ? path.slice(home.length) : '';
+  return declared.type === 'file' && name !== '' && !name.includes('/');
+}
+
+/**
+ * An upload the door holds and no save has used yet, chosen for the file
+ * setting it fits (`uploadFits`), as one change of the save: written by its
+ * upload id, so nothing is sent again, with the token of a file already at
+ * its path; what the setting named before is taken out as for a file chosen.
+ */
+export async function stageStoredUpload(
+  place: TaskPlace,
+  declared: DeclaredInput,
+  upload: { id: string; path: string; size: number },
+  was: string,
+): Promise<StagedInput> {
+  const before = await ownBefore(place, ownFolder(declared.id), was);
+  const known = before.find((old) => old.path === upload.path);
+  const planned: PlannedChange[] = [
+    {
+      path: upload.path,
+      token: known?.token ?? (await tokenNow(place, upload.path)),
+      upload: upload.id,
+      size: upload.size,
+    },
+  ];
+  for (const old of before) {
+    if (old.path !== upload.path) {
+      planned.push({ path: old.path, token: old.token, remove: true });
+    }
+  }
+  return {
+    id: declared.id,
+    value: upload.path,
+    was,
+    planned,
+    summary: `${lastPart(upload.path)}, ${formatSize(upload.size)}`,
   };
 }
 

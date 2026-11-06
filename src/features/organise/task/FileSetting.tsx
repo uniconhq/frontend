@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { DeclaredInput } from '@/api/types';
+import type { PartTransfer } from '@/api/upload/parts';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Chip } from '@/ui/Chip';
@@ -7,9 +8,10 @@ import { FileDrop } from '@/ui/FileDrop';
 import { InfoTip } from '@/ui/InfoTip';
 import { formatSize } from '@/lib/size';
 import { SavedFile, SavedFolder } from '../files/FilePreview';
+import { useOpenUploads } from '../files/use-open-uploads';
 import { useNamed } from './named-file';
 import { inputTitle, lastPart, type TaskPlace } from './build-data';
-import type { StagedInput } from './input-files';
+import { uploadFits, type StagedInput } from './input-files';
 import shared from '../organise.module.css';
 import classes from './task.module.css';
 
@@ -19,7 +21,9 @@ import classes from './task.module.css';
  * choose another, or a box to choose its file when it names none. A file
  * chosen waits for the task's save, which writes it under the input's own
  * folder and points the setting at it; Undo puts the setting back. A big
- * file goes through the upload door at the save, as a test's does.
+ * file goes through the upload door at the save, as a test's does. A file
+ * the door holds for this setting from a save that never happened is offered
+ * as Use uploaded, which waits for the save as a file chosen does.
  */
 export function FileSetting({
   place,
@@ -28,6 +32,7 @@ export function FileSetting({
   staged,
   hint,
   onChoose,
+  onUseUpload,
   onUndo,
   onClear,
   disabled,
@@ -39,6 +44,8 @@ export function FileSetting({
   /** What to know while choosing, such as that the setting is required. */
   hint: string | undefined;
   onChoose: (files: File[]) => void;
+  /** Chooses an upload the door holds for this setting, for the save to write. */
+  onUseUpload: (upload: PartTransfer) => void;
   onUndo: () => void;
   /** Leaves an optional setting empty; none for a required one. */
   onClear: (() => void) | null;
@@ -49,6 +56,11 @@ export function FileSetting({
   const [viewing, setViewing] = useState(false);
   const [replacing, setReplacing] = useState(false);
   const named = useNamed(place, staged === undefined ? value : '');
+  // Only someone who may change the setting is offered an upload for it.
+  const uploads = useOpenUploads(place, !disabled);
+  const stored = (uploads.data ?? []).filter(
+    (row) => row.status === 'stored' && uploadFits(declared, row.path),
+  );
 
   const drop = (
     <FileDrop
@@ -163,6 +175,23 @@ export function FileSetting({
           {replacing && !disabled && drop}
         </>
       )}
+      {staged === undefined &&
+        !disabled &&
+        stored.map((row) => {
+          const offered = `Use uploaded: ${lastPart(row.path)}, ${formatSize(row.size)}`;
+          return (
+            <div key={row.id} className={shared.actions}>
+              <Button
+                size="xs"
+                variant="secondary"
+                onClick={() => onUseUpload(row)}
+                label={`${offered}, for ${label}`}
+              >
+                {offered}
+              </Button>
+            </div>
+          );
+        })}
     </div>
   );
 }
