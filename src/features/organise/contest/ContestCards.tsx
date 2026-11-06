@@ -18,14 +18,12 @@ import { HoldLine } from './HoldLine';
 
 type Path = { org: string; contest: string };
 
-/** How many entrants there are, and how many wait for an organiser. */
 export function EntrantsCard({ path }: { path: Path }) {
   return (
     <Line view={queryView(useEntrants(path.org, path.contest))} say={entrantsLine} />
   );
 }
 
-/** The ways in, by name, and how many invites wait to be accepted. */
 export function EntryCard({ path }: { path: Path }) {
   const settings = useContestSettings(path.org, path.contest);
   const invites = useInvites({ kind: 'contest', ...path }).data ?? [];
@@ -64,7 +62,7 @@ export function EntryCard({ path }: { path: Path }) {
   );
 }
 
-/** The contest's gradings queue, read again now and then while the live stream is down. */
+/** Read again while the live stream is down. */
 function useQueue(path: Path) {
   return $api.useQuery(
     'get',
@@ -74,11 +72,7 @@ function useQueue(path: Path) {
   );
 }
 
-/**
- * How many gradings failed on Unicon's side and wait (#442), with a link to
- * them on Gradings; nothing while none has, or while the count cannot be
- * read, which the Gradings card says.
- */
+/** Nothing while none has failed, or while the count cannot be read (#442). */
 export function FailedGradings({ path }: { path: Path }) {
   const failed = useQueue(path).data?.failed ?? 0;
   if (failed === 0) return null;
@@ -101,10 +95,6 @@ export function FailedGradings({ path }: { path: Path }) {
   );
 }
 
-/**
- * How many gradings wait to be graded, and how many of those are sent to a
- * machine and wait for one to take them: none is being graded yet.
- */
 export function GradingsCard({ path }: { path: Path }) {
   const view = queryView(useQueue(path));
   return (
@@ -121,7 +111,6 @@ export function GradingsCard({ path }: { path: Path }) {
   );
 }
 
-/** The contest's hold, which a manager can end. */
 export function BoardsCard({ path }: { path: Path }) {
   return (
     <div data-contest={`${path.org}/${path.contest}`}>
@@ -138,7 +127,6 @@ export function AnnouncementsCard({ path }: { path: Path }) {
   );
 }
 
-/** How many questions wait for an answer, of how many asked. */
 export function QuestionsCard({ path }: { path: Path }) {
   const view = queryView(
     $api.useQuery(

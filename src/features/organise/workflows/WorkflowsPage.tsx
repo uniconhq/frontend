@@ -22,11 +22,7 @@ function rows(items: WorkflowItem[]): ListRow[] {
   });
 }
 
-/**
- * Every workflow the person may read: those they may change, with the one
- * way to make a new one (M32), and those shared with them or public, each
- * going to its page.
- */
+/** The one way to make a new workflow is on this page (M32). */
 export function WorkflowsPage() {
   const view = queryView($api.useQuery('get', '/api/v1/workflows'));
   const loading =

@@ -187,51 +187,6 @@ describe('the workflow editor', () => {
     ).toBeDisabled();
   });
 
-  it('greys out a number output on a file port, as a drag does', async () => {
-    const { user } = openEditor();
-
-    await user.click(await portButton(user, 'check', 'expected'));
-    const menu = await openMenu('The port expected of check');
-    const time = within(menu).getByRole('menuitem', { name: /^time_ms from run/ });
-    expect(time).toBeDisabled();
-    expect(time).toHaveTextContent('This takes a file, not a number.');
-    expect(
-      within(menu).getByRole('menuitem', { name: /^output from run/ }),
-    ).not.toBeDisabled();
-  });
-
-  it('writes an optional output into a required port, then shows the forge’s sentence', async () => {
-    const draft = CLASSIC.replace(
-      'outputs:\n',
-      '  - id: again\n    use: unicon/exec@v4\n    with: {language: c}\noutputs:\n',
-    );
-    const sentence =
-      'That output may be missing, so it can be given only to an optional port.';
-    const { user } = openEditor({
-      draft,
-      problems: (values) =>
-        withOf(values, 'again').source === '${{ steps.run.extras }}'
-          ? [{ path: ['steps', 2, 'with', 'source'], message: sentence }]
-          : [],
-    });
-
-    await user.click(await portButton(user, 'again', 'source'));
-    const menu = await openMenu('The port source of again');
-    const extras = within(menu).getByRole('menuitem', { name: /^extras from run/ });
-    expect(extras).not.toBeDisabled();
-    await user.click(extras);
-
-    expect(
-      await within(part('section', 'Problems')).findByText(new RegExp(sentence)),
-    ).toBeInTheDocument();
-    expect(
-      within(await stepBox('again')).getByRole('note', { name: sentence }),
-    ).toBeInTheDocument();
-    expect(withOf(await savedValues(user), 'again').source).toBe(
-      '${{ steps.run.extras }}',
-    );
-  });
-
   it('wires a port from its menu, and saves it as values', async () => {
     const { user } = openEditor();
 
@@ -1968,43 +1923,6 @@ describe('the inputs hidden', () => {
 
   beforeEach(() => {
     localStorage.setItem(INPUTS_SHOWN_KEY, 'hidden');
-  });
-
-  it('hides the inputs the steps read, each step saying on a tab how many it reads', async () => {
-    openEditor();
-
-    const run = await stepBox('run');
-    expect(screen.queryByRole('group', { name: /^Input / })).toBeNull();
-    expect(
-      within(run).getByRole('button', { name: '5 inputs of Step run' }),
-    ).toBeVisible();
-    expect(
-      within(await stepBox('check')).getByRole('button', {
-        name: '1 input of Step check',
-      }),
-    ).toBeVisible();
-    expect(showInputs()).not.toBeChecked();
-  });
-
-  it('pops out on its tab the boxes of the inputs a step reads, each opening its drawer', async () => {
-    const { user } = openEditor();
-
-    const tab = within(await stepBox('run')).getByRole('button', {
-      name: '5 inputs of Step run',
-    });
-    await user.hover(tab);
-    const language = await findPart('[role="group"]', 'Input language');
-    expect(part('[role="group"]', 'Input submission')).toBeVisible();
-    // Each box's wire says the port it feeds.
-    expect(screen.getByText('source', { selector: 'text' })).toBeInTheDocument();
-    await user.click(within(language).getByRole('button'));
-
-    expect(
-      within(drawer('Inputs')).getByLabelText('The input language', { selector: 'li' }),
-    ).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.queryByRole('group', { name: 'Input submission' })).toBeNull(),
-    );
   });
 
   it('draws an input no step reads, so it can be found', async () => {

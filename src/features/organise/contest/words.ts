@@ -1,14 +1,10 @@
-/**
- * Who may see a contest, in the words its organisers choose them by. Who
- * may enter it is a separate question, How people enter.
- */
+/** Who may see the contest. Who may enter is separate, under How people enter. */
 export const VISIBILITY_CHOICES = [
   { value: 'everyone', label: 'Anyone, signed in or not' },
   { value: 'signed-in', label: 'Anyone signed in' },
   { value: 'hidden', label: 'Only its entrants and organisers' },
 ];
 
-/** How big a team is and when it is fixed, as the settings card says it. */
 export function teamsSentence(values: {
   most: string;
   fewest: string;
@@ -29,7 +25,6 @@ export function teamsSentence(values: {
   return `Teams of ${size}, ${fixed}`;
 }
 
-/** Who sees the contest once it is open, as a sentence. */
 export function visibilitySentence(visibility: string): string {
   switch (visibility) {
     case 'everyone':

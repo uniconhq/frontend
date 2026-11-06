@@ -4,12 +4,7 @@ import type { SaveChange, TreeEntry } from '@/api/types';
 import type { WorkflowPlace } from '../files/place';
 import { sendToTask, tokenNow, type UploadState } from '../files/use-task-upload';
 
-/**
- * Where a workflow's uploads wait for the draft's Save, and who is told one is
- * under way. Every uploader of the page shares one: `disabled` holds while
- * any of them uploads or a Save is pending, and `onChange` takes an update
- * of the list as it is then, so two never write over each other's changes.
- */
+/** `onChange` sees the list as it is then, so two uploads never overwrite each other. */
 export type Staging = {
   place: WorkflowPlace;
   changes: SaveChange[];
@@ -18,7 +13,7 @@ export type Staging = {
   disabled: boolean;
 };
 
-/** `change` staged in `current`: in the place of one at its path, keeping that one's token. */
+/** Replaces one at the same path and keeps its token. */
 export function staged(current: SaveChange[], change: SaveChange): SaveChange[] {
   const at = current.findIndex((found) => found.path === change.path);
   if (at < 0) return [...current, change];
@@ -27,11 +22,7 @@ export function staged(current: SaveChange[], change: SaveChange): SaveChange[] 
   );
 }
 
-/**
- * Uploads through the task's door, each staged as a change for the draft's
- * Save; `upload` gives the paths staged, or null when one failed or the
- * page's uploads are locked.
- */
+/** Returns null when a file failed or uploads are locked. */
 export function useStagedUpload({
   place,
   changes,

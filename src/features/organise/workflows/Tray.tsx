@@ -17,7 +17,6 @@ import { versionNumber } from './versions';
 import { needsWords, primitiveTitle, typeWords, visibilityWords } from './words';
 import classes from './workflows.module.css';
 
-/** What each type of input is for, as its tray button says under its name. */
 const INPUT_LINES: Record<ValueType, string> = {
   text: 'A line of text, such as a language name',
   number: 'A number, such as a time limit in seconds',
@@ -27,10 +26,7 @@ const INPUT_LINES: Record<ValueType, string> = {
   folder: 'A folder of files, such as the entrant’s code',
 };
 
-/**
- * The newest usable version of each primitive, in the order the platform
- * lists them: an older version is chosen in the step's drawer.
- */
+/** The newest with no problem, in the platform's order. An older version is chosen in the step's drawer. */
 function newest(primitives: PrimitiveInfo[]): PrimitiveInfo[] {
   const found = new Map<string, PrimitiveInfo>();
   for (const primitive of primitives) {
@@ -54,7 +50,6 @@ function TrayGroup({ title, children }: { title: string; children: ReactNode }) 
   );
 }
 
-/** A thing to add: named by `name`, with what it is under it and a note small. */
 function TrayButton({
   name,
   label = name,
@@ -83,12 +78,6 @@ function TrayButton({
   );
 }
 
-/**
- * The tray over the graph at the top of a draft: an input of each type, the
- * newest version of each primitive, and each run workflow the author can
- * read at each version, found by owner or name. A click adds one, and the
- * editor opens it.
- */
 export function Tray({
   primitives,
   workflows,
@@ -100,9 +89,8 @@ export function Tray({
 }: {
   primitives: PrimitiveInfo[];
   exclude: string;
-  /** Run workflows, never this one, each with its box. */
+  /** Run workflows other than this one. */
   workflows: (PaletteWorkflow & { box: BoxDecl })[];
-  /** Whether the workflows are still being read, could not be, or are all here. */
   finding: 'reading' | 'failed' | 'done';
   onInput: (type: ValueType) => void;
   onPrimitive: (primitive: PrimitiveInfo) => void;

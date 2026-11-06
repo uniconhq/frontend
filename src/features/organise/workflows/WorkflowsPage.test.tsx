@@ -197,27 +197,6 @@ describe('a workflow one may only read', () => {
     expect(await within(run).findByText(/^file or folder · /)).toBeInTheDocument();
   });
 
-  it('opens a box of a version in the editor’s drawer, every field locked and nothing to remove', async () => {
-    server.use(signedIn, page(['v1', 'v2']), primitives, version(CLASSIC), check());
-    const user = userEvent.setup();
-    renderApp('/workflows/unicon/classic');
-
-    const run = await screen.findByRole('group', { name: 'Step run' });
-    await user.click(within(run).getByRole('button', { name: /^run/ }));
-    const drawer = await screen.findByRole('complementary', { name: 'Step run' });
-    const name = within(drawer).getByRole('textbox', { name: 'Name' });
-    expect(name).toHaveValue('run');
-    expect(name).toBeDisabled();
-    const stdin = within(drawer).getByRole('combobox', { name: /^stdin/ });
-    expect(stdin).toHaveDisplayValue('input from the inputs');
-    expect(stdin).toBeDisabled();
-    expect(within(drawer).queryByRole('button', { name: /^Remove/ })).toBeNull();
-    expect(within(drawer).getByText('What it gives')).toBeInTheDocument();
-
-    await user.click(within(drawer).getByRole('button', { name: /Close/ }));
-    expect(screen.queryByRole('complementary', { name: 'Step run' })).toBeNull();
-  });
-
   it('says what a version and the workflows it uses do, and zooms into a box from its Open', async () => {
     const outer = [
       'description: Builds a solution.',

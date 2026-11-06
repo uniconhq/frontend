@@ -3,11 +3,7 @@ import { BodyText } from '@/ui/BodyText';
 import { Textarea } from '@/ui/Textarea';
 import classes from './workflows.module.css';
 
-/**
- * What a draft says it does, applied as the field is left, so undo takes
- * back the whole of it at once. The pages that show the workflow, a task's
- * Workflow card among them, show it above its graph.
- */
+/** Applied as the field is left, so undo takes the whole of it back at once. */
 export function DescriptionField({
   value,
   apply,
@@ -37,7 +33,6 @@ export function DescriptionField({
   );
 }
 
-/** What a workflow says it does, as it is written; nothing when it says nothing. */
 export function Description({ text }: { text: string | null }) {
   if (text === null) return null;
   return (

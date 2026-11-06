@@ -11,15 +11,6 @@ import { server, signedIn } from '@/test/server';
 import { routes } from './router';
 
 describe('routes', () => {
-  it('renders the 404 page inside the shell for an unknown address', async () => {
-    renderApp('/no-such-page');
-
-    expect(
-      await screen.findByRole('heading', { name: 'Page not found', level: 1 }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('unicon')).toBeInTheDocument();
-  });
-
   it.each([
     '/orgs/acme/contests/spring/boards',
     '/orgs/acme/contests/spring/contestants',

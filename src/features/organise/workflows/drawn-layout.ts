@@ -7,10 +7,6 @@ import type { PrimitiveInfo } from './primitives';
 
 const NO_PROBLEMS = pinned([], 0, [], []);
 
-/**
- * The layout DrawnGraph draws `workflow` in, and the newer versions it
- * warns of: `shown` open, or every box with `allOpen`.
- */
 export function useDrawnLayout(
   workflow: Workflow,
   map: Map<string, PrimitiveInfo>,

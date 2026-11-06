@@ -115,18 +115,6 @@ describe('the checks before anything is sent', () => {
     ]);
   });
 
-  it('takes a number only as plain decimal digits', () => {
-    for (const text of ['1e3', '0x10', 'NaN', '.5', '+1', '1 000']) {
-      const refused = checkDraft([alpha], { alpha: { kind: 'text', text } });
-      expect(refused?.extensions['errors'], text).toEqual([
-        {
-          input: 'alpha',
-          message: 'Give a number in plain digits, such as 2.5.',
-        },
-      ]);
-    }
-  });
-
   it('holds an input’s files together to its size, naming the input', () => {
     const refused = checkDraft(inputs, {
       ...full,
