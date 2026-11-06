@@ -4,42 +4,11 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { Announcement, Clarification } from '@/api/types';
 import { renderApp } from '@/test/render';
-import { server, signedIn } from '@/test/server';
+import { announcement, question, server, signedIn } from '@/test/server';
 import { organisedEntrant } from '@/test/contestant';
 import { settingsOf } from '@/test/organiser';
 
 const CONTEST_API = '/api/v1/orgs/:org/contests/:contest';
-
-function announcement(overrides: Partial<Announcement> = {}): Announcement {
-  return {
-    where: { org: 'acme', contest: 'spring', task: null },
-    number: 1,
-    title: 'Welcome',
-    body: 'Good luck.',
-    posted_at: '2026-09-12T09:00:00Z',
-    closed: false,
-    answers_question: false,
-    answers: null,
-    ...overrides,
-  };
-}
-
-function question(overrides: Partial<Clarification> = {}): Clarification {
-  return {
-    contest: { org: 'acme', contest: 'spring', task: null },
-    asker: '20',
-    number: 1,
-    task: null,
-    title: 'Input size?',
-    body: 'How big is n?',
-    asked_at: '2026-09-12T09:10:00Z',
-    answered: false,
-    closed: false,
-    messages: [],
-    may_answer: true,
-    ...overrides,
-  };
-}
 
 describe("a contest's announcements, for its organisers", () => {
   it('posts, edits and closes, keeping a closed one readable and offering no delete', async () => {

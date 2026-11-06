@@ -2,10 +2,23 @@ import { act, waitFor } from '@testing-library/react';
 import { setupServer } from 'msw/node';
 import { expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import type { ContestHome, Me, SessionInfo } from '@/api/types';
+import type {
+  Announcement,
+  Clarification,
+  ContestHome,
+  Me,
+  SessionInfo,
+} from '@/api/types';
 import type { components } from '@/api/schema';
 import { draftRunsOf } from './draft-runs';
-import { listedContests, orgMay, taskDetail } from './may';
+import {
+  type Held,
+  listedContests,
+  orgMay,
+  PICTURES,
+  taskDetail,
+  taskMay,
+} from './may';
 
 /**
  * A fake backend for the tests, so they exercise the real client, the real
@@ -68,6 +81,29 @@ export function problem(
 
 const signedOut = http.get('/api/v1/me', () => problem(401, 'unauthenticated'));
 export const signedIn = http.get('/api/v1/me', () => HttpResponse.json(someone));
+
+/**
+ * Signed in as `someone`, told they may do at the org, its contests and a
+ * task what `held` may there. `task` is the task's state; any `Me` field
+ * given replaces someone's.
+ */
+export function signedInAs(
+  held: Held,
+  { task = taskDetail(), ...me }: { task?: object } & Partial<Me> = {},
+) {
+  return [
+    http.get('/api/v1/me', () => HttpResponse.json({ ...someone, ...me })),
+    http.get('/api/v1/orgs/:org', () =>
+      HttpResponse.json({ display_name: null, description: '', may: orgMay(held) }),
+    ),
+    http.get('/api/v1/orgs/:org/contests', () =>
+      HttpResponse.json(listedContests(held)),
+    ),
+    http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task', () =>
+      HttpResponse.json({ ...task, may: taskMay(held), pictures: PICTURES }),
+    ),
+  ];
+}
 const noRegistration = http.get('/api/v1/auth/register-url', () =>
   HttpResponse.json({ url: null }),
 );
@@ -262,6 +298,39 @@ const emptyOrganising = [
     } satisfies components['schemas']['WorkflowForm']),
   ),
 ];
+
+/** An open announcement of the spring contest, as everyone reads it. */
+export function announcement(overrides: Partial<Announcement> = {}): Announcement {
+  return {
+    where: { org: 'acme', contest: 'spring', task: null },
+    number: 1,
+    title: 'Welcome',
+    body: 'Good luck.',
+    posted_at: '2026-09-12T09:00:00Z',
+    closed: false,
+    answers_question: false,
+    answers: null,
+    ...overrides,
+  };
+}
+
+/** An open question to the spring contest, nothing said back yet, as its organisers read it. */
+export function question(overrides: Partial<Clarification> = {}): Clarification {
+  return {
+    contest: { org: 'acme', contest: 'spring', task: null },
+    asker: '20',
+    number: 1,
+    task: null,
+    title: 'Input size?',
+    body: 'How big is n?',
+    asked_at: '2026-09-12T09:10:00Z',
+    answered: false,
+    closed: false,
+    messages: [],
+    may_answer: true,
+    ...overrides,
+  };
+}
 
 /** No announcement or question anywhere, until a test says there is one. */
 const noThreads = [

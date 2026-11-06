@@ -2,14 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { parseYaml } from './yaml-doc';
 import { CLASSIC, PRIMITIVES } from '@/test/workflows';
 import { GEOMETRY, WORKFLOW_PALETTE, wirePath, type Point } from '../flow/graph';
-import {
-  BOX,
-  layoutWorkflow,
-  rowOf,
-  type Box,
-  type Drawn,
-  type Layout,
-} from './layout';
+import { BOX } from '../flow/box';
+import { layoutWorkflow, rowOf, type Box, type Drawn, type Layout } from './layout';
 import { readWorkflow } from './model';
 import { byRef } from './primitives';
 

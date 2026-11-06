@@ -3,6 +3,7 @@ import { UniconLockup } from '@/ui/brand/UniconLockup';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { Group } from '@/ui/layout';
 import { ApiError } from '@/api/problem';
 import {
   CreateAccountLink,
@@ -47,12 +48,12 @@ export function LoginPage() {
         />
       )}
 
-      <div className={classes.actions}>
+      <Group gap={14} wrap="nowrap">
         <Button href={loginHref(next)}>
           {refused === null ? 'Sign in with Forgejo' : 'Try again'}
         </Button>
         <CreateAccountLink />
-      </div>
+      </Group>
 
       <BodyText tone="secondary">
         You will sign in through {forge === null ? 'Forgejo' : new URL(forge).host},

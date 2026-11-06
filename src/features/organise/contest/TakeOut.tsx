@@ -8,6 +8,7 @@ import { Button } from '@/ui/Button';
 import { PageLink } from '@/ui/PageLink';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { submissionsWords } from '@/ui/scored/scored-text';
+import { Group } from '@/ui/layout';
 import { contestSectionPath } from '@/lib/sections';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { definitionErrorsOf } from '../files/refusals';
@@ -56,7 +57,7 @@ export function TakeOutFoot({
           Withdrawn: entrants do not see it, and no leaderboard counts it. Its{' '}
           {submissionsWords(standing.submissions)} are kept.
         </BodyText>
-        <div className={shared.actions}>
+        <Group gap="xs">
           <Button
             size="xs"
             variant="secondary"
@@ -65,7 +66,7 @@ export function TakeOutFoot({
           >
             Put it back
           </Button>
-        </div>
+        </Group>
       </div>
     );
   }
@@ -73,7 +74,7 @@ export function TakeOutFoot({
   if (asking.step !== 'take-out') return null;
   const remove = asking.would === 'remove';
   return (
-    <div className={shared.actions}>
+    <Group gap="xs">
       <Button
         size="xs"
         variant="danger"
@@ -82,7 +83,7 @@ export function TakeOutFoot({
       >
         {remove ? 'Remove from the contest' : 'Withdraw from the contest'}
       </Button>
-    </div>
+    </Group>
   );
 }
 
@@ -257,11 +258,11 @@ export function TakingOutBody({
             <li key={note}>{note}</li>
           ))}
         </ul>
-        <div className={shared.actions}>
+        <Group gap="xs">
           <Button variant="secondary" onClick={() => onDone('put-back')}>
             Done
           </Button>
-        </div>
+        </Group>
       </div>
     );
   }
@@ -277,7 +278,7 @@ export function TakingOutBody({
         </BodyText>
       )}
       {error !== null && <Refusal error={error} org={org} contest={contest} />}
-      <div className={shared.actions}>
+      <Group gap="xs">
         <Button
           variant={asking.step === 'take-out' ? 'danger' : 'primary'}
           loading={pending}
@@ -292,7 +293,7 @@ export function TakingOutBody({
         <Button variant="secondary" onClick={onCancel}>
           Not now
         </Button>
-      </div>
+      </Group>
     </div>
   );
 }

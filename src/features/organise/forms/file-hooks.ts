@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { byPlace } from '@/api/place';
 import { $api } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { WriteFile } from '@/api/types';
@@ -48,21 +49,22 @@ export function useFileWrite(place: Place, path: string) {
   const write = async (body: WriteFile): Promise<Outcome> => {
     let outcome: Outcome;
     try {
-      if (place.kind === 'task') {
-        const result = await writeTask.mutateAsync({
-          params: {
-            path: { org: place.org, contest: place.contest, task: place.task, path },
-          },
-          body,
-        });
-        outcome = { kind: 'saved', result };
-      } else {
-        const written = await writeContest.mutateAsync({
-          params: { path: { org: place.org, contest: place.contest, path } },
-          body,
-        });
-        outcome = { kind: 'written', version: written.version, notes: written.notes };
-      }
+      outcome = await byPlace(place, {
+        task: async (at): Promise<Outcome> => ({
+          kind: 'saved',
+          result: await writeTask.mutateAsync({
+            params: { path: { ...at, path } },
+            body,
+          }),
+        }),
+        contest: async (at) => {
+          const written = await writeContest.mutateAsync({
+            params: { path: { ...at, path } },
+            body,
+          });
+          return { kind: 'written', version: written.version, notes: written.notes };
+        },
+      });
     } catch (caught) {
       return { kind: 'refused', error: toApiError(caught), body };
     }

@@ -4,16 +4,17 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { SaveRequest } from '@/api/types';
-import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { afterAnswers, problem, server, signedIn } from '@/test/server';
+import { afterAnswers, problem, server, signedIn, signedInAs } from '@/test/server';
 import {
   TASK_API,
   publicationList,
   repoFiles,
   taskState,
-  unchanged,
   publishedTask,
+  fileContent,
+  published,
+  treeEntry,
 } from '@/test/organiser';
 
 /** The task's page, opened at its Statement card. */
@@ -68,15 +69,7 @@ function uploadRoutes({
     ...partTransport(`${TASK_API}/organise/part-uploads`),
     http.post(`${TASK_API}/save`, async ({ request }) => {
       seen.saves.push((await request.json()) as SaveRequest);
-      return HttpResponse.json({
-        number: 3,
-        version: 'abc1234def',
-        grading_changed: false,
-        changes: [],
-        notes: [],
-        regraded: 0,
-        effect: unchanged,
-      });
+      return HttpResponse.json(published());
     }),
   ];
   return { seen, handlers };
@@ -86,13 +79,14 @@ function uploadRoutes({
 const DIGEST = 'b'.repeat(64);
 const uploadedStatement = http.get(`${TASK_API}/files/:path`, ({ params }) =>
   params['path'] === 'statement.md'
-    ? HttpResponse.json({
-        path: 'statement.md',
-        encoding: 'utf-8',
-        content: `version https://git-lfs.github.com/spec/v1\noid sha256:${DIGEST}\nsize 314572800\n`,
-        token: 'token-statement',
-        upload: { size: 314_572_800, digest: DIGEST },
-      })
+    ? HttpResponse.json(
+        fileContent({
+          path: 'statement.md',
+          content: `version https://git-lfs.github.com/spec/v1\noid sha256:${DIGEST}\nsize 314572800\n`,
+          token: 'token-statement',
+          upload: { size: 314_572_800, digest: DIGEST },
+        }),
+      )
     : undefined,
 );
 
@@ -240,26 +234,18 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       http.post(`${TASK_API}/save`, async ({ request }) => {
         saves.push((await request.json()) as SaveRequest);
         if (saves.length === 1) return problem(409, 'conflict');
-        return HttpResponse.json({
-          number: 4,
-          version: 'def5678abc',
-          grading_changed: false,
-          changes: [],
-          notes: [],
-          regraded: 0,
-          effect: unchanged,
-        });
+        return HttpResponse.json(published({ number: 4 }));
       }),
       http.get(`${TASK_API}/files/:path`, ({ params }) =>
         params['path'] === 'statement.md' && saves.length > 0
-          ? HttpResponse.json({
-              path: 'statement.md',
-              encoding: 'utf-8',
-              content: 'pointer',
-              token: 'token-theirs',
-              upload: { size: 2048, digest: 'c'.repeat(64) },
-              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-            })
+          ? HttpResponse.json(
+              fileContent({
+                path: 'statement.md',
+                content: 'pointer',
+                token: 'token-theirs',
+                upload: { size: 2048, digest: 'c'.repeat(64) },
+              }),
+            )
           : undefined,
       ),
       uploadedStatement,
@@ -352,15 +338,9 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
             changes: ['the statement'],
             asked: 'b1c2d3e:12',
           });
-        return HttpResponse.json({
-          number: 5,
-          version: 'abc1234def',
-          grading_changed: true,
-          changes: ['the statement'],
-          notes: [],
-          regraded: 0,
-          effect: unchanged,
-        });
+        return HttpResponse.json(
+          published({ number: 5, grading_changed: true, changes: ['the statement'] }),
+        );
       }),
     );
     const panel = await uploadAndSave();
@@ -426,14 +406,13 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       http.get(`${TASK_API}/tree`, ({ request }) =>
         new URL(request.url).searchParams.get('path') === ''
           ? HttpResponse.json([
-              { path: 'task.yaml', kind: 'file', size: 120, upload: null },
-              { path: 'notes.md', kind: 'file', size: 12, upload: null },
-              {
+              treeEntry({ path: 'task.yaml', size: 120 }),
+              treeEntry({ path: 'notes.md', size: 12 }),
+              treeEntry({
                 path: 'train.csv',
-                kind: 'file',
                 size: 130,
                 upload: { size: 314_572_800, digest: DIGEST },
-              },
+              }),
             ])
           : undefined,
       ),
@@ -441,14 +420,15 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       http.get(`${TASK_API}/files/:path`, ({ params }) => {
         if (params['path'] === 'train.csv') read = true;
         return params['path'] === 'train.csv'
-          ? HttpResponse.json({
-              path: 'train.csv',
-              encoding: 'utf-8',
-              content: 'version https://git-lfs.github.com/spec/v1\n',
-              token: 'token-train',
-              upload: { size: 314_572_800, digest: DIGEST },
-              version: null,
-            })
+          ? HttpResponse.json(
+              fileContent({
+                path: 'train.csv',
+                content: 'version https://git-lfs.github.com/spec/v1\n',
+                token: 'token-train',
+                upload: { size: 314_572_800, digest: DIGEST },
+                version: null,
+              }),
+            )
           : undefined;
       }),
       ...repoFiles,
@@ -478,8 +458,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
 
   it('offers an observer no upload', async () => {
     server.use(
-      signedIn,
-      ...holding('observer', publishedTask),
+      ...signedInAs('observer', { task: publishedTask }),
       taskState,
       publicationList,
       uploadedStatement,

@@ -1,3 +1,6 @@
+import { taskPagePath } from '@/lib/contest-paths';
+import { entrantGradingsPath } from '@/lib/sections';
+
 /**
  * The open submission is the `submission` search parameter of the task page,
  * so a link to one works, and a reload or the back button comes back to it.
@@ -6,6 +9,17 @@ const SUBMISSION_PARAM = 'submission';
 
 export function submissionHref(number: number): string {
   return `?${SUBMISSION_PARAM}=${number}`;
+}
+
+/**
+ * Where a counted submission on a leaderboard opens: for staff, as the board
+ * says, the entrant's submissions to the task; for anyone else, their own.
+ */
+export function countedSubmissionTo(org: string, contest: string, staff: boolean) {
+  return (task: string, number: number, entrant: string): string =>
+    staff
+      ? entrantGradingsPath(org, contest, task, entrant)
+      : `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
 }
 
 /** The submission the address opens, when it names one that can be. */

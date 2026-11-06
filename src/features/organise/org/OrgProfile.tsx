@@ -5,7 +5,9 @@ import { Button } from '@/ui/Button';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
+import { Group } from '@/ui/layout';
+import { useFocusOnShow } from '@/lib/use-focus-on-show';
 import { useOrgMay } from '../may';
 import classes from '../organise.module.css';
 import own from './org.module.css';
@@ -40,11 +42,7 @@ function EditForm({
   });
   const [displayName, setDisplayName] = useState(profile.display_name ?? '');
   const [description, setDescription] = useState(profile.description);
-  const first = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    first.current?.focus();
-  }, []);
+  const first = useFocusOnShow<HTMLInputElement>();
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -85,14 +83,14 @@ function EditForm({
           <ErrorBlock error={update.error} compact heading="Couldn’t save" />
         </div>
       )}
-      <div className={classes.actions}>
+      <Group gap="xs">
         <Button type="submit" loading={update.isPending}>
           Save
         </Button>
         <Button variant="secondary" onClick={onDone} disabled={update.isPending}>
           Cancel
         </Button>
-      </div>
+      </Group>
     </form>
   );
 }
@@ -125,38 +123,39 @@ export function OrgProfile({ org }: { org: string }) {
   return (
     <div className={classes.stack}>
       <SectionTitle>Name and description</SectionTitle>
-      {view.state === 'loading' && <PageSkeleton rows={2} />}
-      {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
-      {view.state === 'ready' &&
-        (editing ? (
-          <EditForm org={org} profile={view.data} onDone={close} />
-        ) : (
-          <>
-            <dl className={own.fields} aria-label="About the org">
-              <div>
-                <dt>Display name</dt>
-                <dd>
-                  {view.data.display_name !== null && view.data.display_name !== ''
-                    ? view.data.display_name
-                    : 'Not set, so the org’s name is shown.'}
-                </dd>
-              </div>
-              <div>
-                <dt>Description</dt>
-                <dd>
-                  {view.data.description !== '' ? view.data.description : 'Not set.'}
-                </dd>
-              </div>
-            </dl>
-            {administers && (
-              <div ref={opener} className={classes.actions}>
-                <Button variant="secondary" onClick={() => setEditing(true)}>
-                  Edit
-                </Button>
-              </div>
-            )}
-          </>
-        ))}
+      <Loaded view={view} rows={2}>
+        {(profile) =>
+          editing ? (
+            <EditForm org={org} profile={profile} onDone={close} />
+          ) : (
+            <>
+              <dl className={own.fields} aria-label="About the org">
+                <div>
+                  <dt>Display name</dt>
+                  <dd>
+                    {profile.display_name !== null && profile.display_name !== ''
+                      ? profile.display_name
+                      : 'Not set, so the org’s name is shown.'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Description</dt>
+                  <dd>
+                    {profile.description !== '' ? profile.description : 'Not set.'}
+                  </dd>
+                </div>
+              </dl>
+              {administers && (
+                <Group ref={opener} gap="xs">
+                  <Button variant="secondary" onClick={() => setEditing(true)}>
+                    Edit
+                  </Button>
+                </Group>
+              )}
+            </>
+          )
+        }
+      </Loaded>
     </div>
   );
 }

@@ -19,6 +19,7 @@ import {
   TASK_BUILD_CARDS,
   TASK_SECTIONS,
 } from '@/lib/sections';
+import { workflowItem } from '@/test/workflows';
 
 /** Each part of the trail: its words, where it goes, and whether it is the page. */
 async function trail() {
@@ -213,17 +214,7 @@ describe("the breadcrumb's menus", () => {
     server.use(
       signedIn,
       http.get('/api/v1/workflows', () =>
-        HttpResponse.json([
-          {
-            owner: 'kenny',
-            name: 'tuned',
-            description: '',
-            editable: true,
-            versions: [],
-            visibility: 'private',
-            yanked: {},
-          },
-        ]),
+        HttpResponse.json([workflowItem({ versions: [] })]),
       ),
     );
     renderApp('/account');

@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { delay, http, HttpResponse } from 'msw';
-import userEvent from '@/test/user-event';
-import { renderApp } from '@/test/render';
-import { afterAnswers, server, signedIn } from '@/test/server';
-import { CLASSIC, workflowBackend } from '@/test/workflows';
+import { afterAnswers, server } from '@/test/server';
+import { CLASSIC } from '@/test/workflows';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 import {
-  EDITOR_PAGE,
+  openEditor,
   part,
   barButton,
   fileText,
@@ -34,10 +32,7 @@ const memoryAsText = (content: string) =>
 
 describe('saving and publishing a workflow', () => {
   it('saves a draft with a problem', async () => {
-    const backend = workflowBackend(CLASSIC, { problems: memoryAsText });
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor({ problems: memoryAsText });
 
     await user.click(await portButton(user, 'run', 'memory_limit'));
     await user.click(
@@ -70,13 +65,13 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('will not publish a version of a saved draft with a problem', async () => {
-    const backend = workflowBackend(
-      CLASSIC.replace('memory_limit: ${{ inputs.memory_limit }}', 'memory_limit: 9'),
-      { problems: memoryAsText },
-    );
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor({
+      draft: CLASSIC.replace(
+        'memory_limit: ${{ inputs.memory_limit }}',
+        'memory_limit: 9',
+      ),
+      problems: memoryAsText,
+    });
 
     await findProblems(/One problem to fix/);
     await user.click(barButton('Publish version'));
@@ -87,10 +82,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('will not publish a saved draft until its check has answered', async () => {
-    const backend = workflowBackend(CLASSIC);
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor();
 
     await findProblems(/Nothing to fix/);
     server.use(http.post('/api/v1/workflows/check', () => delay('infinite')));
@@ -110,22 +102,18 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('says in the forge’s words why it made no version', async () => {
-    const backend = workflowBackend(CLASSIC, {
+    const { user, backend } = openEditor({
       problems: () => [
         {
           path: ['steps', 1, 'use'],
           message: 'unicon/diff-check@v2 is not a primitive Unicon knows.',
         },
       ],
+      handlers: [
+        // The check passed when it ran; the forge refuses when the version is made.
+        http.post('/api/v1/workflows/check', () => HttpResponse.json({ problems: [] })),
+      ],
     });
-    server.use(
-      // The check passed when it ran; the forge refuses when the version is made.
-      http.post('/api/v1/workflows/check', () => HttpResponse.json({ problems: [] })),
-      signedIn,
-      ...backend.handlers,
-    );
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
 
     await findProblems(/Nothing to fix/);
     await user.click(barButton('Publish version'));
@@ -141,10 +129,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('publishes a saved draft that checks as the next version', async () => {
-    const backend = workflowBackend(CLASSIC);
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor();
 
     await findProblems(/Nothing to fix/);
     await user.click(barButton('Publish version'));
@@ -159,10 +144,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('publishes the number after the highest version, whatever else is tagged', async () => {
-    const backend = workflowBackend(CLASSIC, { versions: ['v1', 'beta', 'v9'] });
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor({ versions: ['v1', 'beta', 'v9'] });
 
     await findProblems(/Nothing to fix/);
     await user.click(barButton('Publish version'));
@@ -183,10 +165,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('offers the next version once someone else has published the one it offered', async () => {
-    const backend = workflowBackend(CLASSIC, { versions: ['v1'] });
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor({ versions: ['v1'] });
 
     await findProblems(/Nothing to fix/);
     // Someone else publishes v2 after the page was read.
@@ -205,10 +184,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('saves changes and then publishes what was saved, from Save and publish', async () => {
-    const backend = workflowBackend(CLASSIC);
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor();
 
     await findProblems(/Nothing to fix/);
     await user.click(await outputButton(user, 'run', 'time_ms'));
@@ -239,10 +215,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('publishes nothing when the save before it meets someone else’s, and says so', async () => {
-    const backend = workflowBackend(CLASSIC);
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor();
 
     await findProblems(/Nothing to fix/);
     await user.click(await outputButton(user, 'run', 'time_ms'));
@@ -269,16 +242,14 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('shows the draft or a version from the bar’s switcher', async () => {
-    const backend = workflowBackend(CLASSIC, { versions: ['v1', 'v2'] });
-    server.use(
-      signedIn,
-      ...backend.handlers,
-      http.get('/api/v1/workflows/kenny/tuned/versions/:version', () =>
-        HttpResponse.json({ content: CLASSIC }),
-      ),
-    );
-    const user = userEvent.setup();
-    const { router } = renderApp(EDITOR_PAGE);
+    const { user, router } = openEditor({
+      versions: ['v1', 'v2'],
+      handlers: [
+        http.get('/api/v1/workflows/kenny/tuned/versions/:version', () =>
+          HttpResponse.json({ content: CLASSIC }),
+        ),
+      ],
+    });
 
     const showing = await screen.findByRole('combobox', { name: 'Showing' });
     expect(showing).toHaveValue('');
@@ -309,10 +280,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('opens the merge view on a save over someone else’s, matching steps by id', async () => {
-    const backend = workflowBackend(CLASSIC);
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor();
 
     await user.click(await portButton(user, 'run', 'args'));
     await user.click(
@@ -348,10 +316,7 @@ describe('saving and publishing a workflow', () => {
   it('keeps the unsaved draft when the tab comes back after someone else saved, and meets theirs at the save', async () => {
     fakeLiveStream();
     try {
-      const backend = workflowBackend(CLASSIC);
-      server.use(signedIn, ...backend.handlers);
-      const user = userEvent.setup();
-      renderApp(EDITOR_PAGE);
+      const { user, backend } = openEditor();
 
       await user.click(await portButton(user, 'run', 'args'));
       openStream();
@@ -387,10 +352,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('merges again over a second save by someone else, from the file merged over', async () => {
-    const backend = workflowBackend(CLASSIC);
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor();
 
     await user.click(await portButton(user, 'run', 'args'));
     await user.click(
@@ -436,10 +398,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('takes the current file in the merge view as one step undo goes back over', async () => {
-    const backend = workflowBackend(CLASSIC);
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor();
 
     await user.click(await portButton(user, 'run', 'args'));
     await user.click(

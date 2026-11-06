@@ -1,4 +1,23 @@
 import { parse } from 'yaml';
+import type { DeclaredInput } from '@/api/types';
+
+/** An input a task's workflow declares, required, with nothing more said of it. */
+export function declared(
+  id: string,
+  type: string,
+  more: Partial<DeclaredInput> = {},
+): DeclaredInput {
+  return {
+    id,
+    type,
+    options: null,
+    optional: false,
+    title: null,
+    help: null,
+    unit: null,
+    ...more,
+  };
+}
 
 /**
  * A task's settings, written as `task.yaml`, as the server gives them to a

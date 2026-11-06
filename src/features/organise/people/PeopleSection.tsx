@@ -6,7 +6,7 @@ import type { Holder, RoleName, ScopeNames } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { RadioGroup } from '@/ui/RadioGroup';
@@ -14,6 +14,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Group, Stack } from '@/ui/layout';
 import {
   CONTEST_SECTIONS,
   ORG_SECTIONS,
@@ -27,6 +28,7 @@ import { ROLE_LABEL, ROLE_AREAS, roleMeans, type RolePlace } from '../roles';
 import { usePeopleMay } from '../may';
 import { InvitesSection } from '../invites/InvitesSection';
 import { holdersQuery, useHolders, useRoleChanges } from './holders';
+import tableClasses from '@/ui/table.module.css';
 import classes from './people.module.css';
 
 /**
@@ -68,14 +70,8 @@ function organisersOf(names: ScopeNames): string {
   return taskSectionPath(names.org, names.contest, names.task, 'organisers');
 }
 
-/** A refused change of a role, in the server's words. */
-function Refusal({ error }: { error: unknown }) {
-  return (
-    <div role="alert">
-      <ErrorBlock error={error} compact heading="Couldn’t change the role" />
-    </div>
-  );
-}
+/** The heading over a refused change of a role, in the row or its dialog. */
+const REFUSED = 'Couldn’t change the role';
 
 /**
  * What every change leaves stale: the list here, and, when the change was
@@ -138,7 +134,7 @@ function HolderRow({
   return (
     <tr ref={row} tabIndex={-1}>
       <th scope="row">
-        <div className={classes.person}>
+        <Stack gap={2}>
           <span>
             {name}
             {isMe && ' (you)'}
@@ -146,17 +142,17 @@ function HolderRow({
           {holder.user.name !== null && (
             <BodyText tone="secondary">{holder.user.name}</BodyText>
           )}
-        </div>
+        </Stack>
       </th>
       <td>{ROLE_LABEL[holder.role]}</td>
       <td>
         {inherited ? (
-          <div className={classes.person}>
+          <Stack gap={2}>
             <span>{givenAt(holder.at_names)}</span>
             {manages && (
               <PageLink to={organisersOf(holder.at_names)}>Change it there</PageLink>
             )}
-          </div>
+          </Stack>
         ) : (
           `This ${place.kind}`
         )}
@@ -164,7 +160,7 @@ function HolderRow({
       {manages && (
         <td>
           {changeable && (
-            <div className={classes.actions}>
+            <Group gap={6} align="stretch">
               <Button
                 size="xs"
                 variant="secondary"
@@ -181,7 +177,7 @@ function HolderRow({
               >
                 Remove
               </Button>
-            </div>
+            </Group>
           )}
           {open === 'role' && (
             <form
@@ -195,18 +191,20 @@ function HolderRow({
                 options={roleOptions(giveAdmin, place.kind)}
                 onChange={(value) => setRole(value as RoleName)}
               />
-              <div className={classes.actions}>
+              <Group gap={6} align="stretch">
                 <Button size="xs" type="submit" loading={pending}>
                   Save
                 </Button>
                 <Button size="xs" variant="secondary" onClick={() => show(null)}>
                   Cancel
                 </Button>
-              </div>
+              </Group>
             </form>
           )}
-          {error !== null && open !== 'remove' && <Refusal error={error} />}
-          <Modal
+          {error !== null && open !== 'remove' && (
+            <ErrorBlock error={error} compact alert heading={REFUSED} />
+          )}
+          <ConfirmDialog
             opened={open === 'remove'}
             onClose={() => show(null)}
             title={
@@ -214,27 +212,18 @@ function HolderRow({
                 ? `Give up your role at this ${place.kind}?`
                 : `Remove ${name}’s role?`
             }
+            confirm="Remove"
+            variant="danger"
+            loading={pending}
+            error={error}
+            refused={REFUSED}
+            onConfirm={() => void run('remove', () => revoke(holder.user.id))}
           >
-            <div className={classes.inline}>
-              <BodyText>
-                {isMe ? 'You' : name} will no longer see or change {REACHES[place.kind]}
-                , unless a role given elsewhere covers it.
-              </BodyText>
-              {error !== null && <Refusal error={error} />}
-              <div className={classes.actions}>
-                <Button
-                  variant="danger"
-                  loading={pending}
-                  onClick={() => void run('remove', () => revoke(holder.user.id))}
-                >
-                  Remove
-                </Button>
-                <Button variant="secondary" onClick={() => show(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </Modal>
+            <BodyText>
+              {isMe ? 'You' : name} will no longer see or change {REACHES[place.kind]},
+              unless a role given elsewhere covers it.
+            </BodyText>
+          </ConfirmDialog>
         </td>
       )}
     </tr>
@@ -296,10 +285,10 @@ export function PeopleSection({ place }: { place: RolePlace }) {
   return (
     <>
       <Card>
-        <div className={classes.stack}>
+        <Stack gap="sm">
           <SectionTitle>What each role can do</SectionTitle>
-          <div style={{ overflowX: 'auto' }}>
-            <table className={classes.table} aria-label="What each role can do">
+          <div className={tableClasses.scroll}>
+            <table className={tableClasses.table} aria-label="What each role can do">
               <thead>
                 <tr>
                   <th scope="col">Role</th>
@@ -322,12 +311,12 @@ export function PeopleSection({ place }: { place: RolePlace }) {
               </tbody>
             </table>
           </div>
-        </div>
+        </Stack>
       </Card>
       <Card>
         <Loaded view={view}>
           {(holders) => (
-            <table className={classes.table} aria-label={title}>
+            <table className={tableClasses.table} aria-label={title}>
               <thead>
                 <tr>
                   <th scope="col">Person</th>
@@ -353,7 +342,7 @@ export function PeopleSection({ place }: { place: RolePlace }) {
         </Loaded>
       </Card>
       <Card>
-        <div className={classes.stack}>
+        <Stack gap="sm">
           <SectionTitle>Invites</SectionTitle>
           <BodyText tone="secondary">
             Someone becomes an organiser here by accepting an invite.
@@ -364,7 +353,7 @@ export function PeopleSection({ place }: { place: RolePlace }) {
             manages={manages}
             giveAdmin={giveAdmin}
           />
-        </div>
+        </Stack>
       </Card>
     </>
   );

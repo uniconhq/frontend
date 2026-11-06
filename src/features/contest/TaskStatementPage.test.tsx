@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, type RequestHandler } from 'msw';
+import type { TaskPage } from '@/api/types';
 import { formatDateTime, formatWhen } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import userEvent from '@/test/user-event';
@@ -18,16 +19,23 @@ import { passTime, withFakeTimers } from '@/test/timers';
 
 const PAGE = '/contests/acme/spring/tasks/sum';
 
+/**
+ * The task page for someone signed in, the task read with `page` over the
+ * usual one. A handler given wins over that read.
+ */
+function open(page: Partial<TaskPage> = {}, ...handlers: RequestHandler[]) {
+  server.use(
+    signedIn,
+    noSubmissions,
+    ...handlers,
+    http.get(`${TASK_API}/page`, () => HttpResponse.json({ ...taskPage, ...page })),
+  );
+  return renderApp(PAGE);
+}
+
 describe('a task page for a signed-in person', () => {
   it('renders the statement as Markdown and lists its times and limits', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () =>
-        HttpResponse.json({ ...taskPage, due: '2026-09-12T10:15:00Z' }),
-      ),
-    );
-    renderApp(PAGE);
+    open({ due: '2026-09-12T10:15:00Z' });
 
     expect(
       await screen.findByRole('heading', { name: 'A. Sum of Two', level: 1 }),
@@ -53,15 +61,12 @@ describe('a task page for a signed-in person', () => {
   });
 
   it('leads an organiser of the contest back to organising it', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
+    open(
+      {},
       http.get(`${CONTEST_API}/home`, () =>
         HttpResponse.json({ ...home(), organises: true }),
       ),
     );
-    renderApp(PAGE);
 
     expect(
       await screen.findByRole('link', { name: 'Back to organising' }),
@@ -69,12 +74,7 @@ describe('a task page for a signed-in person', () => {
   });
 
   it('says no worth on a task that gives no points', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
-    );
-    renderApp(PAGE);
+    open();
 
     const list = await screen.findByLabelText('Limits');
     expect(within(list).queryByText('Worth')).toBeNull();
@@ -91,26 +91,20 @@ describe('a task page for a signed-in person', () => {
   ] as const)(
     'says in the panel’s place why it takes nothing, %s',
     async (closed, said) => {
-      server.use(
-        signedIn,
-        noSubmissions,
+      open(
+        {
+          release: {
+            released: closed !== 'not_released',
+            visible: true,
+            open: false,
+            closed,
+          },
+        },
         // Someone whose registration waits for approval.
         http.get(`${CONTEST_API}/home`, () =>
           HttpResponse.json(home({ registration: registration() })),
         ),
-        http.get(`${TASK_API}/page`, () =>
-          HttpResponse.json({
-            ...taskPage,
-            release: {
-              released: closed !== 'not_released',
-              visible: true,
-              open: false,
-              closed,
-            },
-          }),
-        ),
       );
-      renderApp(PAGE);
 
       const why = await screen.findByRole('status', { name: 'Why you cannot submit' });
       await waitFor(() => expect(why).toHaveTextContent(said));
@@ -119,18 +113,7 @@ describe('a task page for a signed-in person', () => {
   );
 
   it("counts down to the row's due and close, extension included, by the server's clock", async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () =>
-        HttpResponse.json({
-          ...taskPage,
-          due: '2026-09-12T10:15:00Z',
-          closes: '2026-09-12T10:45:00Z',
-        }),
-      ),
-    );
-    renderApp(PAGE);
+    open({ due: '2026-09-12T10:15:00Z', closes: '2026-09-12T10:45:00Z' });
 
     const timer = await screen.findByRole('timer', { name: 'Task countdown' });
     await waitFor(() => expect(timer).toHaveTextContent(/Due in (14m 5\ds|15m 00s)/));
@@ -143,22 +126,13 @@ describe('a task page for a signed-in person', () => {
     const asked = new Promise<void>((resolve) => {
       answer = resolve;
     });
-    server.use(
-      signedIn,
-      noSubmissions,
+    open(
+      { due: '2026-09-12T10:15:00Z', closes: '2026-09-12T10:45:00Z' },
       http.get('/api/v1/time', async () => {
         await asked;
         return HttpResponse.json({ now: '2026-09-12T10:00:00Z' });
       }),
-      http.get(`${TASK_API}/page`, () =>
-        HttpResponse.json({
-          ...taskPage,
-          due: '2026-09-12T10:15:00Z',
-          closes: '2026-09-12T10:45:00Z',
-        }),
-      ),
     );
-    renderApp(PAGE);
 
     const timer = await screen.findByRole('timer', { name: 'Task countdown' });
     const title = screen.getByRole('heading', { name: 'A. Sum of Two', level: 1 });
@@ -178,12 +152,7 @@ describe('a task page for a signed-in person', () => {
   });
 
   it('links to asking the organisers about the task', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
-    );
-    renderApp(PAGE);
+    open();
 
     expect(
       await screen.findByRole('link', { name: 'Ask a question about this task' }),
@@ -191,22 +160,9 @@ describe('a task page for a signed-in person', () => {
   });
 
   it('offers no question to someone not approved yet', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () =>
-        HttpResponse.json({
-          ...taskPage,
-          release: {
-            released: true,
-            visible: true,
-            open: false,
-            closed: 'not_approved',
-          },
-        }),
-      ),
-    );
-    renderApp(PAGE);
+    open({
+      release: { released: true, visible: true, open: false, closed: 'not_approved' },
+    });
 
     await screen.findByRole('heading', { name: 'A. Sum of Two', level: 1 });
     expect(
@@ -215,13 +171,10 @@ describe('a task page for a signed-in person', () => {
   });
 
   it("says it counts by the device's clock when the server's time did not come in", async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
+    open(
+      {},
       http.get('/api/v1/time', () => problem(404, 'not_found')),
-      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
     );
-    renderApp(PAGE);
 
     const timer = await screen.findByRole('timer', { name: 'Task countdown' });
     await waitFor(() =>
@@ -232,14 +185,7 @@ describe('a task page for a signed-in person', () => {
   });
 
   it('says a submission past the due is late, and still takes it', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () =>
-        HttpResponse.json({ ...taskPage, due: '2026-09-12T09:50:00Z' }),
-      ),
-    );
-    renderApp(PAGE);
+    open({ due: '2026-09-12T09:50:00Z' });
 
     const timer = await screen.findByRole('timer', { name: 'Task countdown' });
     await waitFor(() =>
@@ -250,35 +196,19 @@ describe('a task page for a signed-in person', () => {
   });
 
   it('leaves out raw HTML an organiser wrote into the statement', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () =>
-        HttpResponse.json({
-          ...taskPage,
-          statement: 'Before <img src=x onerror="alert(1)"> after\n',
-        }),
-      ),
-    );
-    const { container } = renderApp(PAGE);
+    const { container } = open({
+      statement: 'Before <img src=x onerror="alert(1)"> after\n',
+    });
 
     expect(await screen.findByText(/Before/)).toBeVisible();
     expect(container.querySelector('img[src="x"]')).toBeNull();
   });
 
   it('shows an image as a link to it and opens links out of the site apart', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () =>
-        HttpResponse.json({
-          ...taskPage,
-          statement:
-            '![a diagram](http://elsewhere.test/d.png) and [a guide](https://guide.test)\n',
-        }),
-      ),
-    );
-    const { container } = renderApp(PAGE);
+    const { container } = open({
+      statement:
+        '![a diagram](http://elsewhere.test/d.png) and [a guide](https://guide.test)\n',
+    });
 
     const picture = await screen.findByRole('link', { name: 'a diagram' });
     expect(picture).toHaveAttribute('href', 'http://elsewhere.test/d.png');
@@ -289,22 +219,14 @@ describe('a task page for a signed-in person', () => {
   });
 
   it('draws the task’s own pictures from its route, and keeps any other image a link', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () =>
-        HttpResponse.json({
-          ...taskPage,
-          statement: [
-            '![the tree](public/tree.png)',
-            '![the graph](./public/figures/graph%201.svg)',
-            '![outside](public/../task.yaml)',
-            '![from afar](https://elsewhere.test/public/d.png)',
-          ].join('\n\n'),
-        }),
-      ),
-    );
-    const { container } = renderApp(PAGE);
+    const { container } = open({
+      statement: [
+        '![the tree](public/tree.png)',
+        '![the graph](./public/figures/graph%201.svg)',
+        '![outside](public/../task.yaml)',
+        '![from afar](https://elsewhere.test/public/d.png)',
+      ].join('\n\n'),
+    });
 
     const tree = await screen.findByRole('img', { name: 'the tree' });
     expect(tree).toHaveAttribute(
@@ -324,12 +246,10 @@ describe('a task page for a signed-in person', () => {
   });
 
   it('says in words that a task not released, or taken out of the contest, is not there', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
+    open(
+      {},
       http.get(`${TASK_API}/page`, () => problem(404, 'not_found')),
     );
-    renderApp(PAGE);
 
     expect(
       await screen.findByRole('heading', { name: 'Task not found' }),
@@ -349,22 +269,17 @@ describe('a task page for a signed-in person', () => {
 
 describe('what a task page shows of its show', () => {
   it('lists the runs and settings the task shows, each file through its own route', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () =>
-        HttpResponse.json({
-          ...taskPage,
-          runs: [
-            {
-              group: 'samples',
-              place: 1,
-              tuples: [{ title: null, key: { input: { file: 'samples/1.in' } } }],
-            },
-          ],
-          shown_inputs: { time_limit: 2 },
-        }),
-      ),
+    open(
+      {
+        runs: [
+          {
+            group: 'samples',
+            place: 1,
+            tuples: [{ title: null, key: { input: { file: 'samples/1.in' } } }],
+          },
+        ],
+        shown_inputs: { time_limit: 2 },
+      },
       http.get(`${TASK_API}/runs/:group/:place/inputs/:name`, ({ params }) =>
         HttpResponse.json({
           files: [
@@ -376,7 +291,6 @@ describe('what a task page shows of its show', () => {
         }),
       ),
     );
-    renderApp(PAGE);
 
     const samples = await screen.findByRole('region', { name: 'Group samples' });
     expect(samples).toHaveTextContent('Test 11.in');
@@ -391,12 +305,7 @@ describe('what a task page shows of its show', () => {
   });
 
   it('shows nothing of it when the task shows nothing before a submission', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
-    );
-    renderApp(PAGE);
+    open();
     expect(await screen.findByLabelText('Limits')).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Tests' })).toBeNull();
   });
@@ -424,9 +333,8 @@ describe('a task page as the task opens', () => {
 
   it('brings the panel back once the task is open', async () => {
     let asked = 0;
-    server.use(
-      signedIn,
-      noSubmissions,
+    open(
+      {},
       http.get(`${TASK_API}/page`, () => {
         asked += 1;
         return HttpResponse.json(
@@ -444,7 +352,6 @@ describe('a task page as the task opens', () => {
         );
       }),
     );
-    renderApp(PAGE);
 
     expect(
       await screen.findByRole('status', { name: 'Why you cannot submit' }),

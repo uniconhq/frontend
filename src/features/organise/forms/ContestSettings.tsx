@@ -6,9 +6,9 @@ import { Button } from '@/ui/Button';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { Textarea } from '@/ui/Textarea';
 import { TextInput } from '@/ui/TextInput';
+import { Group } from '@/ui/layout';
 import { ContestFile, FieldBox } from '../contest/ContestFile';
 import { useOpenedField } from '../contest/opened';
-import shared from '../organise.module.css';
 import { readContest, writeContest, type ContestValues } from './contest-values';
 import { Fieldset, NumberField, TimeField } from './fields';
 import { numberProblem } from './values';
@@ -191,7 +191,7 @@ function SettingsForm({
         </Fieldset>
 
         {manager && (
-          <div className={shared.actions}>
+          <Group gap="xs">
             <Button
               type="submit"
               loading={busy}
@@ -200,7 +200,7 @@ function SettingsForm({
               Save settings
             </Button>
             {changed && <UnsavedNote />}
-          </div>
+          </Group>
         )}
       </fieldset>
       <LeaveGuard dirty={unsaved} what="Your changes to the settings" />

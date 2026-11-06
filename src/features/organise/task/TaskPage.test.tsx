@@ -5,9 +5,8 @@ import { delay, http, HttpResponse } from 'msw';
 import type { WorkflowForm } from '@/api/types';
 import { TASK_BUILD_CARDS, TASK_SECTIONS } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
-import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
+import { problem, server, signedIn, signedInAs } from '@/test/server';
 import {
   CONTEST_API,
   TASK_API,
@@ -18,8 +17,9 @@ import {
   settingsOf,
   standingList,
   taskState,
-  unchanged,
+  published,
 } from '@/test/organiser';
+import { declared } from '@/test/task-values';
 
 const TASK = '/orgs/acme/contests/spring/tasks/sum';
 
@@ -104,14 +104,9 @@ describe('the task page', () => {
       standingList,
       ...repoFiles,
       http.put(`${TASK_API}/files/:path`, () =>
-        HttpResponse.json({
-          number: 3,
-          grading_changed: true,
-          changes: ['The time limit changes.'],
-          notes: [],
-          regraded: 0,
-          effect: unchanged,
-        }),
+        HttpResponse.json(
+          published({ grading_changed: true, changes: ['The time limit changes.'] }),
+        ),
       ),
     );
     renderApp(`${TASK}?card=statement`);
@@ -179,8 +174,7 @@ describe('the task page', () => {
 
   it('says where it stands in its contest as text to an observer of the contest', async () => {
     server.use(
-      signedIn,
-      ...holding('observer', publishedTask),
+      ...signedInAs('observer', { task: publishedTask }),
       taskState,
       publicationList,
       standingList,
@@ -394,28 +388,13 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
           problem: null,
           graded: false,
           inputs: [
-            {
-              id: 'time_limit',
-              type: 'number',
-              options: null,
-              optional: false,
-              title: 'Time limit',
-              help: null,
-              unit: 'seconds',
-            },
+            declared('time_limit', 'number', { title: 'Time limit', unit: 'seconds' }),
           ],
         }),
       ),
       http.post(`${TASK_API}/save`, async ({ request }) => {
         saves.push(await request.json());
-        return HttpResponse.json({
-          number: 3,
-          grading_changed: false,
-          changes: [],
-          notes: [],
-          regraded: 0,
-          effect: unchanged,
-        });
+        return HttpResponse.json(published());
       }),
       ...repoFiles,
     );

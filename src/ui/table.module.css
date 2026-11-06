@@ -1,0 +1,38 @@
+/* A wide table scrolls sideways inside its card, not the page. */
+.scroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+.table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--unicon-text-secondary);
+  padding: 6px 10px 8px 0;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+.table td,
+.table tbody th {
+  vertical-align: top;
+  padding: 10px 10px 10px 0;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+/* A row header reads like a cell. */
+.table tbody th {
+  font-weight: 400;
+  color: var(--unicon-text-body);
+}
+
+/* Shorter rows; kept here so it comes after the rules above. */
+.compact td,
+.compact tbody th {
+  padding-block: 8px;
+}

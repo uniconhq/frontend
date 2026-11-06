@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import userEvent from '@/test/user-event';
 import { renderWithProviders } from '@/test/render';
 import { afterAnswers, server } from '@/test/server';
+import { workflowBox, workflowItem } from '@/test/workflows';
 import { Tray } from './Tray';
 
 it('ignores a pending choice after closing search and editing the draft', async () => {
@@ -17,15 +18,12 @@ it('ignores a pending choice after closing search and editing the draft', async 
     http.get('/api/v1/workflow-search', () =>
       HttpResponse.json({
         items: [
-          {
+          workflowItem({
             owner: 'ada',
             name: 'inner',
-            versions: ['v1'],
             visibility: 'public',
-            description: '',
-            yanked: {},
             editable: false,
-          },
+          }),
         ],
         next: null,
       }),
@@ -33,13 +31,7 @@ it('ignores a pending choice after closing search and editing the draft', async 
     http.get('/api/v1/workflows/ada/inner/versions/v1/box', async () => {
       started = true;
       await gate;
-      return HttpResponse.json({
-        run: true,
-        inputs: [],
-        outputs: [],
-        newer_version: null,
-        description: null,
-      });
+      return HttpResponse.json(workflowBox());
     }),
   );
   function Draft() {

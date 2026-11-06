@@ -1,18 +1,17 @@
 import type { FeedEntry, Rejudged } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { PageLink } from '@/ui/PageLink';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { submissionsWords } from '@/ui/scored/scored-text';
+import { Group } from '@/ui/layout';
 import { contestSectionPath } from '@/lib/sections';
 import { UNFINISHED, submitterOf } from './feed';
 import { regradeSearch } from './regrades';
 import type { Asking } from './use-grading-actions';
 import shared from '../organise.module.css';
-import classes from './feed.module.css';
 
 /** The most characters the sentence a cancel gives its entrant may run to. */
 const REASON_MAX = 500;
@@ -36,7 +35,7 @@ export function AttemptActions({
 }) {
   const { status } = entry.grading;
   return (
-    <div className={classes.actions}>
+    <Group gap={6} align="stretch">
       {!UNFINISHED.has(status) && status !== 'cancelled' && (
         <Button
           size="xs"
@@ -57,7 +56,7 @@ export function AttemptActions({
           Cancel
         </Button>
       )}
-    </div>
+    </Group>
   );
 }
 
@@ -219,20 +218,11 @@ const REFUSED_HEADING: Record<Asking['kind'], string> = {
   rejudge: 'Couldn’t rejudge',
 };
 
-/** A refusal in the dialog, in the server's words. */
-function Refusal({ asking, error }: { asking: Asking; error: unknown }) {
-  return (
-    <div role="alert">
-      <ErrorBlock error={error} compact heading={REFUSED_HEADING[asking.kind]} />
-    </div>
-  );
-}
-
 /**
  * The confirmation for whatever is being asked, which keeps a refusal and
  * closes once the change has gone through.
  */
-export function ConfirmDialog({
+export function AskingDialog({
   asking,
   pending,
   error,
@@ -248,13 +238,24 @@ export function ConfirmDialog({
   onClose: () => void;
 }) {
   return (
-    <Modal
+    <ConfirmDialog
       opened={asking !== null}
       onClose={onClose}
       title={asking === null ? '' : titleOf(asking)}
+      confirm={asking === null ? '' : confirmOf(asking)}
+      cancel="Not now"
+      variant={asking?.kind === 'cancel' ? 'danger' : 'primary'}
+      loading={pending}
+      disabled={
+        (asking?.kind === 'cancel' && asking.reason.trim() === '') ||
+        (asking?.kind === 'rejudge' && asking.task === '')
+      }
+      error={error}
+      refused={asking === null ? undefined : REFUSED_HEADING[asking.kind]}
+      onConfirm={onConfirm}
     >
       {asking !== null && (
-        <div className={shared.stack}>
+        <>
           {asking.kind === 'rejudge' && asking.choose !== undefined && (
             <Select
               label="Task"
@@ -289,26 +290,9 @@ export function ConfirmDialog({
               required
             />
           )}
-          {error !== null && <Refusal asking={asking} error={error} />}
-          <div className={classes.actions}>
-            <Button
-              variant={asking.kind === 'cancel' ? 'danger' : 'primary'}
-              loading={pending}
-              disabled={
-                (asking.kind === 'cancel' && asking.reason.trim() === '') ||
-                (asking.kind === 'rejudge' && asking.task === '')
-              }
-              onClick={onConfirm}
-            >
-              {confirmOf(asking)}
-            </Button>
-            <Button variant="secondary" onClick={onClose}>
-              Not now
-            </Button>
-          </div>
-        </div>
+        </>
       )}
-    </Modal>
+    </ConfirmDialog>
   );
 }
 

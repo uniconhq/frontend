@@ -12,6 +12,7 @@ import { StoredSettings } from '../files/StoredSettings';
 import { SavedFolder } from '../files/FilePreview';
 import type { Place } from '../files/place';
 import { PageLink } from '@/ui/PageLink';
+import { Group } from '@/ui/layout';
 import { taskPath } from '@/lib/organiser-paths';
 import { savedBy } from './published';
 import { STORED } from '../contest/places';
@@ -77,7 +78,7 @@ function AllFiles({ place }: { place: Extract<Place, { kind: 'task' }> }) {
           task&apos;s page: a run&apos;s file on the Runs card, pictures from the
           Statement card, and a setting&apos;s file in its box on the Inputs card.
         </BodyText>
-        <div className={classes.actions}>
+        <Group gap="xs">
           <Button
             variant="secondary"
             aria-expanded={open}
@@ -85,7 +86,7 @@ function AllFiles({ place }: { place: Extract<Place, { kind: 'task' }> }) {
           >
             {open ? 'Hide the files' : 'View all files'}
           </Button>
-        </div>
+        </Group>
         {open && (
           <SavedFolder
             place={place}

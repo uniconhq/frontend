@@ -21,13 +21,6 @@
   background: var(--unicon-canvas);
 }
 
-.bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-}
-
 .switch {
   min-width: 220px;
 }
@@ -43,19 +36,6 @@
   margin: 0;
   color: var(--unicon-text-secondary);
   font-size: 13px;
-}
-
-.tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 /* What stops the draft from becoming a version, each linked to its box. */
@@ -211,12 +191,6 @@
   font-weight: 700;
 }
 
-.portValue {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .outputs {
   display: flex;
   flex-direction: column;
@@ -321,50 +295,8 @@
   }
 }
 
-/* The graph's frame: the page's whole width, the graph at its actual size
- * inside it, sliding sideways when it is wider. */
-.frame {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  border: 1px solid var(--unicon-border);
-  border-radius: var(--mantine-radius-sm);
-  background: var(--unicon-body);
-}
-
 .canvas {
   min-width: 100%;
-}
-
-/* A box's face, under the room every box keeps above it for a workflow
- * box's ears. Each part has a fixed height (`BOX` in layout.ts, read here
- * as --box-*), so the layout knows where each wire meets it. */
-.box {
-  position: relative;
-  width: 100%;
-  height: calc(100% - var(--box-stack));
-  margin-top: var(--box-stack);
-  border: var(--box-border) solid var(--unicon-border-strong);
-  border-radius: var(--mantine-radius-sm);
-  background: var(--unicon-chrome);
-  color: var(--unicon-text-body);
-  font-size: 12px;
-}
-
-.box[data-selected] {
-  box-shadow: 0 0 0 3px var(--unicon-border-strong);
-}
-
-/* A box's head: its name and how often it runs, its primitive's title with
- * the reference small beside it, and what the primitive does, or the box's
- * problem in its place. */
-.header {
-  display: flex;
-  flex-direction: column;
-  height: var(--box-head);
-  padding: 6px 10px 0;
-  border-bottom: 1px solid var(--unicon-border);
-  overflow: hidden;
 }
 
 .headButton {
@@ -385,23 +317,6 @@
 
 .headButton:focus-visible {
   outline: 2px solid var(--mantine-primary-color-filled);
-}
-
-.titleLine,
-.primitiveLine {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--unicon-text-primary);
 }
 
 /* What kind of box it is, beside its name. */
@@ -432,52 +347,6 @@
   color: var(--unicon-text-meta);
   font-family: var(--mantine-font-family-monospace);
   font-size: 10px;
-}
-
-.detail {
-  color: var(--unicon-text-secondary);
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.description,
-.headProblem {
-  display: -webkit-box;
-  margin: 4px 0 0;
-  overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  color: var(--unicon-text-secondary);
-  font-size: 11px;
-  line-height: 15px;
-}
-
-.headProblem {
-  color: var(--unicon-text-danger);
-}
-
-/* A line under the head: what is wrong, or what a closed step needs and gives. */
-.line {
-  display: block;
-  height: var(--box-line);
-  max-width: none;
-  margin: 0;
-  padding: 4px 10px 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* A closed box's pin each side, on its title line. */
-.pin {
-  width: 8px;
-  height: 8px;
-  min-width: 0;
-  min-height: 0;
-  border: 0;
 }
 
 /*
@@ -553,25 +422,6 @@
 .peekLabel {
   fill: var(--unicon-text-secondary);
   font-size: 11px;
-}
-
-/* While a wire is dragged, a closed box that would take it, and one that would not. */
-.box[data-drop='offered'] {
-  outline: 2px dashed var(--unicon-text-accent);
-  outline-offset: 3px;
-}
-
-.box[data-drop='refused'] {
-  opacity: 0.6;
-}
-
-/* A workflow box's ears, above its face, so it reads as a stack. */
-.ear {
-  position: absolute;
-  height: var(--box-stack);
-  border: var(--box-border) solid var(--unicon-border-strong);
-  border-radius: var(--mantine-radius-sm);
-  background: var(--unicon-chrome);
 }
 
 /* A workflow box's foot, which opens it. */
@@ -673,31 +523,12 @@
   font-style: italic;
 }
 
-.problem {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--mantine-color-red-filled);
-  color: white;
-  font-weight: 700;
-  font-size: 11px;
-}
-
 .problemBeside {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--unicon-text-danger);
   font-size: 11px;
-}
-
-.headProblem .problem {
-  margin-right: 4px;
-  vertical-align: -3px;
 }
 
 .refusedMark {
@@ -978,14 +809,6 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-}
-
-.wellBar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
 }
 
 .side {

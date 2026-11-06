@@ -2,9 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import type { Announcement, Clarification } from '@/api/types';
+import type { Clarification } from '@/api/types';
 import { renderApp } from '@/test/render';
-import { server, signedIn } from '@/test/server';
+import {
+  announcement,
+  question as organisedQuestion,
+  server,
+  signedIn,
+} from '@/test/server';
 import {
   CONTEST_API,
   TASK_API,
@@ -18,35 +23,9 @@ import { passTime, withFakeTimers } from '@/test/timers';
 const HOME = '/contests/acme/spring';
 const QUESTIONS = `${HOME}/questions`;
 
-function announcement(overrides: Partial<Announcement> = {}): Announcement {
-  return {
-    where: { org: 'acme', contest: 'spring', task: null },
-    number: 1,
-    title: 'Welcome',
-    body: 'Good luck.',
-    posted_at: '2026-09-12T09:00:00Z',
-    closed: false,
-    answers_question: false,
-    answers: null,
-    ...overrides,
-  };
-}
-
+/** A question as its asker reads it, which they may not answer. */
 function question(overrides: Partial<Clarification> = {}): Clarification {
-  return {
-    contest: { org: 'acme', contest: 'spring', task: null },
-    asker: '20',
-    number: 1,
-    task: null,
-    title: 'Input size?',
-    body: 'How big is n?',
-    asked_at: '2026-09-12T09:10:00Z',
-    answered: false,
-    closed: false,
-    messages: [],
-    may_answer: false,
-    ...overrides,
-  };
+  return organisedQuestion({ may_answer: false, ...overrides });
 }
 
 const approvedHome = http.get(`${CONTEST_API}/home`, () =>

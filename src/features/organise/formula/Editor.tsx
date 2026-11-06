@@ -28,6 +28,7 @@ import {
   type ViewUpdate,
 } from '@codemirror/view';
 import { BodyText } from '@/ui/BodyText';
+import { Stack } from '@/ui/layout';
 import type { Catalogue } from './catalogue';
 import {
   contextAt,
@@ -767,7 +768,7 @@ export function FormulaTiles({
   );
   const programs = inColumn('program');
   return (
-    <div className={classes.trays}>
+    <Stack gap={8}>
       <BodyText size="sm" tone="secondary">
         {target === null
           ? 'Click in a formula, then click a tile to put it at the cursor. Or just type: what fits pops up as you go.'
@@ -820,6 +821,6 @@ export function FormulaTiles({
           )}
         </Group>
       </div>
-    </div>
+    </Stack>
   );
 }

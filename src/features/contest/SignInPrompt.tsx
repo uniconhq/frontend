@@ -3,17 +3,17 @@ import { useLocation } from 'react-router';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { PageTitle } from '@/ui/PageTitle';
+import { Group, Stack } from '@/ui/layout';
 import { CreateAccountLink, currentPath, loginHref } from '@/session';
-import classes from './contest.module.css';
 
 /** The way in, back to this page: sign in, and create an account where open. */
 export function SignInButtons() {
   const location = useLocation();
   return (
-    <div className={classes.actions}>
+    <Group gap="sm">
       <Button href={loginHref(currentPath(location))}>Sign in</Button>
       <CreateAccountLink />
-    </div>
+    </Group>
   );
 }
 
@@ -24,7 +24,7 @@ export function SignInButtons() {
  */
 export function SignInPrompt({ title, back }: { title: string; back?: ReactNode }) {
   return (
-    <div className={classes.page}>
+    <Stack gap="md">
       {back}
       <PageTitle>{title}</PageTitle>
       <BodyText>
@@ -32,6 +32,6 @@ export function SignInPrompt({ title, back }: { title: string; back?: ReactNode 
         it.
       </BodyText>
       <SignInButtons />
-    </div>
+    </Stack>
   );
 }

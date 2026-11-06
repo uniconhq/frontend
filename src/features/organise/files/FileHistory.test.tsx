@@ -5,16 +5,16 @@ import { http, HttpResponse } from 'msw';
 import type { Holder } from '@/api/types';
 import type { components } from '@/api/schema';
 import { formatDateTime } from '@/lib/time';
-import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { problem, server, signedIn, signedInAs, someone } from '@/test/server';
 import {
   TASK_API,
   publicationList,
   publications,
   repoFiles,
   taskState,
-  unchanged,
+  fileContent,
+  published,
 } from '@/test/organiser';
 
 type Change = components['schemas']['Change'];
@@ -131,13 +131,13 @@ describe("a task file's history", () => {
       http.get(`${TASK_API}/files/:path`, ({ request }) => {
         at = new URL(request.url).searchParams.get('at');
         if (at === null) return undefined;
-        return HttpResponse.json({
-          path: 'task.yaml',
-          encoding: 'utf-8',
-          content: 'name: sum\n',
-          token: 'token-old',
-          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-        });
+        return HttpResponse.json(
+          fileContent({
+            path: 'task.yaml',
+            content: 'name: sum\n',
+            token: 'token-old',
+          }),
+        );
       }),
     );
     const list = await openHistory();
@@ -161,14 +161,14 @@ describe("a task file's history", () => {
       http.get(`${TASK_API}/files/:path`, ({ request }) =>
         new URL(request.url).searchParams.get('at') === null
           ? undefined
-          : HttpResponse.json({
-              path: 'task.yaml',
-              encoding: 'utf-8',
-              content: POINTER,
-              token: 'token-old',
-              upload: { size: 2048, digest: 'a'.repeat(64) },
-              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-            }),
+          : HttpResponse.json(
+              fileContent({
+                path: 'task.yaml',
+                content: POINTER,
+                token: 'token-old',
+                upload: { size: 2048, digest: 'a'.repeat(64) },
+              }),
+            ),
       ),
     );
     const list = await openHistory();
@@ -189,14 +189,7 @@ describe("a task file's history", () => {
     server.use(
       http.post(`${TASK_API}/files/:path/rollback`, async ({ request }) => {
         sent.push(await request.json());
-        return HttpResponse.json({
-          number: 3,
-          grading_changed: false,
-          changes: [],
-          notes: [],
-          regraded: 0,
-          effect: unchanged,
-        });
+        return HttpResponse.json(published());
       }),
     );
     const list = await openHistory();
@@ -232,14 +225,9 @@ describe("a task file's history", () => {
         const body = (await request.json()) as (typeof sent)[number];
         sent.push(body);
         return body.confirm
-          ? HttpResponse.json({
-              number: 3,
-              grading_changed: true,
-              changes: ['limits changed'],
-              notes: [],
-              regraded: 0,
-              effect: unchanged,
-            })
+          ? HttpResponse.json(
+              published({ grading_changed: true, changes: ['limits changed'] }),
+            )
           : problem(409, 'confirmation_required', {
               changes: ['limits changed'],
               asked: 'b1c2d3e:12',
@@ -305,7 +293,7 @@ describe("a task file's history", () => {
 
   it('shows an observer the history with no rollback', async () => {
     history();
-    server.use(signedIn, ...holding('observer'));
+    server.use(...signedInAs('observer'));
     const list = await openHistory();
 
     expect(list.getAllByRole('listitem')).toHaveLength(4);

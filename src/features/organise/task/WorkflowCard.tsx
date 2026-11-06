@@ -5,6 +5,7 @@ import { Button } from '@/ui/Button';
 import { Chip } from '@/ui/Chip';
 import { PageLink } from '@/ui/PageLink';
 import { Loaded } from '@/ui/feedback/Loaded';
+import { Group } from '@/ui/layout';
 import { workflowPath } from '@/lib/organiser-paths';
 import { FieldBox } from '../contest/ContestFile';
 import { VersionGraph } from '../workflows/VersionGraph';
@@ -16,7 +17,6 @@ import {
   useWorkflowList,
   useWorkflowVersion,
 } from './build-data';
-import shared from '../organise.module.css';
 
 /** The workflow named, as the chip shows it, linking to its page at that version. */
 function WorkflowChip({ workflow }: { workflow: string }) {
@@ -58,7 +58,7 @@ function Steps({ workflow }: { workflow: string }) {
               {...parts}
               text={read.content}
               primitives={list}
-              bar={(tools) => <div className={shared.actions}>{tools}</div>}
+              bar={(tools) => <Group gap="xs">{tools}</Group>}
             />
           )}
         </Loaded>
@@ -114,7 +114,7 @@ export function WorkflowCard({
       {problem !== null && <BodyText>{problem}</BodyText>}
       {yanked !== null && <BodyText>Not for new tasks. {yanked.reason}</BodyText>}
       {newerRef !== null && (
-        <div className={shared.actions} role="status" aria-label="A newer version">
+        <Group gap="xs" role="status" aria-label="A newer version">
           <Chip tone="warn">{newer} available</Chip>
           <BodyText tone="secondary">
             The task grades with {saved} until {newerRef} is chosen and saved.
@@ -124,7 +124,7 @@ export function WorkflowCard({
               Use {newer}
             </Button>
           )}
-        </div>
+        </Group>
       )}
       <FieldBox name="workflow">
         <Loaded view={list} rows={1}>

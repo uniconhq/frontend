@@ -1,11 +1,10 @@
-import { http, HttpResponse } from 'msw';
 import type { ListedContest, OrgMay, PlaceMay, RoleName } from '@/api/types';
 
 /**
  * What the fake backend tells a reader they may do, as the forge works it
  * out for each role held at the place; `null` holds none there.
  */
-type Held = RoleName | null;
+export type Held = RoleName | null;
 
 const CONTEST_LOCKED = ['name', 'description', 'state', 'visibility', 'registration'];
 const TASK_LOCKED = ['name', 'submissions'];
@@ -88,24 +87,4 @@ export function taskDetail(held: Held = 'admin') {
     may: taskMay(held),
     pictures: PICTURES,
   };
-}
-
-/**
- * The answers that tell a reader holding `held` at the org, a contest and
- * a task what they may do there, for a test about someone else than the
- * admin every test starts as. `task` is the task's state, the default one
- * unless a test gives its own.
- */
-export function holding(held: Held, task: object = taskDetail()) {
-  return [
-    http.get('/api/v1/orgs/:org', () =>
-      HttpResponse.json({ display_name: null, description: '', may: orgMay(held) }),
-    ),
-    http.get('/api/v1/orgs/:org/contests', () =>
-      HttpResponse.json(listedContests(held)),
-    ),
-    http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task', () =>
-      HttpResponse.json({ ...task, may: taskMay(held), pictures: PICTURES }),
-    ),
-  ];
 }

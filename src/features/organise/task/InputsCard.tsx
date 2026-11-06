@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { DeclaredInput } from '@/api/types';
 import type { PartTransfer } from '@/api/upload/parts';
 import { BodyText } from '@/ui/BodyText';
@@ -8,6 +7,7 @@ import { Chip } from '@/ui/Chip';
 import { InfoTip } from '@/ui/InfoTip';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
+import { Group } from '@/ui/layout';
 import { FieldBox } from '../contest/ContestFile';
 import { typeWords } from '../workflows/words';
 import { NumberField } from '../forms/fields';
@@ -16,7 +16,6 @@ import { BuildCard, CardPart } from './BuildCard';
 import { inputTitle, type TaskPlace } from './build-data';
 import { FileSetting } from './FileSetting';
 import type { StagedInput } from './input-files';
-import shared from '../organise.module.css';
 import classes from './task.module.css';
 
 /** A choice of `options`, keeping a value the file has that is not one of them. */
@@ -318,16 +317,16 @@ function DeclaredItem({
   return (
     <FieldBox name={declared.id}>
       <div className={classes.item} role="group" aria-label={inputTitle(declared)}>
-        <div className={classes.itemHead}>
-          <div className={classes.titleRow}>
+        <Group gap="4px 12px" align="baseline" justify="space-between">
+          <Group gap={4} wrap="nowrap">
             <h4 className={classes.itemTitle}>{declared.title ?? declared.id}</h4>
             {/* A value's field carries its help; the others have it here. */}
             {(entrant || perRun) && declared.help !== null && (
               <InfoTip about={declared.title ?? declared.id}>{declared.help}</InfoTip>
             )}
-          </div>
+          </Group>
           <Chip tone="quiet">{typeWords(declared.type)}</Chip>
-        </div>
+        </Group>
         <div className={classes.narrow}>
           <Select
             label="Who gives it"
@@ -381,170 +380,6 @@ function DeclaredItem({
 }
 
 /**
- * An input when the workflow cannot be read, so its declarations are not
- * known: what the settings hold for it, as a value or as what entrants see
- * of it, which the save checks against the workflow.
- */
-function UnknownItem({
-  input,
-  onChange,
-  onRemove,
-  disabled,
-}: {
-  input: InputValues;
-  onChange: Change;
-  onRemove: () => void;
-  disabled: boolean;
-}) {
-  const id = input.id;
-  return (
-    <FieldBox name={id}>
-      <div className={classes.item} role="group" aria-label={id}>
-        <div className={classes.itemHead}>
-          <h4 className={classes.itemTitle}>{id}</h4>
-          <span className={classes.id}>
-            {input.kind === 'details' ? 'entrants give it' : 'the task sets it'}
-          </span>
-        </div>
-        {input.kind === 'details' ? (
-          <div className={classes.grid}>
-            <TextInput
-              label="Label shown to entrants"
-              value={input.label}
-              onChange={(label) => onChange({ label })}
-              placeholder={id}
-              disabled={disabled}
-            />
-            <TextInput
-              label="Options entrants choose from"
-              value={input.options}
-              onChange={(options) => onChange({ options })}
-              description="For a choice, separated by commas."
-              disabled={disabled}
-            />
-            <TextInput
-              label="Filled in to start with"
-              value={input.default}
-              onChange={(value) => onChange({ default: value })}
-              disabled={disabled}
-            />
-            <NumberField
-              label="Smallest allowed"
-              value={input.min}
-              onChange={(min) => onChange({ min })}
-              hint="For a number."
-              disabled={disabled}
-            />
-            <NumberField
-              label="Largest allowed"
-              value={input.max}
-              onChange={(max) => onChange({ max })}
-              hint="For a number."
-              disabled={disabled}
-            />
-            <TextInput
-              label="Maximum size"
-              value={input.maxSize}
-              onChange={(maxSize) => onChange({ maxSize })}
-              placeholder="Default"
-              description="For files, such as 1MB."
-              disabled={disabled}
-            />
-          </div>
-        ) : (
-          <div className={classes.grid}>
-            <TextInput
-              label="Value"
-              value={input.value}
-              onChange={(value) => onChange({ value })}
-              description={
-                input.secret
-                  ? 'The name the org keeps the secret under.'
-                  : 'A number, true or false, a file of the task, or text.'
-              }
-              disabled={disabled}
-            />
-            <Checkbox
-              label="Use one of the org’s secrets"
-              checked={input.secret}
-              onChange={(secret) => onChange({ secret })}
-              disabled={disabled}
-            />
-          </div>
-        )}
-        {!disabled && (
-          <div className={shared.actions}>
-            <Button
-              size="xs"
-              variant="secondary"
-              onClick={() =>
-                onChange({ kind: input.kind === 'details' ? 'value' : 'details' })
-              }
-              label={`Make ${id} ${input.kind === 'details' ? 'set by the task' : 'given by entrants'}`}
-            >
-              {input.kind === 'details' ? 'The task sets it' : 'Entrants give it'}
-            </Button>
-            <Button
-              size="xs"
-              variant="danger"
-              onClick={onRemove}
-              label={`Remove ${id}`}
-            >
-              Remove
-            </Button>
-          </div>
-        )}
-      </div>
-    </FieldBox>
-  );
-}
-
-/** Adding an input by its id, when the workflow's own list cannot be read. */
-function AddUnknown({
-  taken,
-  onAdd,
-}: {
-  taken: string[];
-  onAdd: (id: string, kind: InputValues['kind']) => void;
-}) {
-  const [id, setId] = useState('');
-  const trimmed = id.trim();
-  const clash = taken.includes(trimmed);
-  const add = (kind: InputValues['kind']) => {
-    onAdd(trimmed, kind);
-    setId('');
-  };
-  return (
-    <div className={classes.grid}>
-      <TextInput
-        label="Another input, by its name in the workflow"
-        value={id}
-        onChange={setId}
-        description={clash ? 'There is an input with this name already.' : undefined}
-      />
-      <div className={shared.actions}>
-        <Button
-          size="xs"
-          variant="secondary"
-          disabled={trimmed === '' || clash}
-          onClick={() => add('value')}
-        >
-          Add one the task sets
-        </Button>
-        <Button
-          size="xs"
-          variant="secondary"
-          disabled={trimmed === '' || clash}
-          onClick={() => add('details')}
-        >
-          Add one entrants give
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/**
  * The Inputs card: the form the workflow's inputs make, in the order the
  * workflow declares them, each saying who gives it: the task, the entrant
  * (what they see of it, the choices they have and how much they may send),
@@ -552,8 +387,7 @@ function AddUnknown({
  * the workflow, a number's unit after it, its help behind an ⓘ; a setting
  * that is a file or a folder has its own box to view, upload and replace it
  * (`FileSetting`). Inputs the task has that the workflow does not are listed
- * to remove. When the workflow cannot be read, the inputs the settings have
- * are shown as they are, to keep or remove.
+ * to remove. When the workflow cannot be read, the card asks for one, with why.
  */
 export function InputsCard({
   declared,
@@ -565,7 +399,6 @@ export function InputsCard({
   onGive = () => undefined,
   onAxis = () => undefined,
   onRemove,
-  onAdd,
   files,
   disabled,
 }: {
@@ -584,7 +417,6 @@ export function InputsCard({
   onGive?: (id: string, give: Give) => void;
   onAxis?: (id: string, axis: number) => void;
   onRemove: (id: string) => void;
-  onAdd: (id: string, kind: InputValues['kind']) => void;
   disabled: boolean;
 }) {
   const line =
@@ -592,25 +424,9 @@ export function InputsCard({
   if (declared === null) {
     return (
       <BuildCard id="inputs" title="Inputs" line={line}>
-        <BodyText>
-          {workflowProblem ?? 'The workflow cannot be read'} The inputs below are those
-          the task has saved. Saving checks them against the workflow.
-        </BodyText>
-        {inputs.length === 0 ? (
-          <BodyText tone="secondary">The task has no inputs saved.</BodyText>
-        ) : (
-          inputs.map((input) => (
-            <UnknownItem
-              key={input.id}
-              input={input}
-              onChange={(change) => onChange(input.id, change)}
-              onRemove={() => onRemove(input.id)}
-              disabled={disabled}
-            />
-          ))
-        )}
-        {!disabled && (
-          <AddUnknown taken={inputs.map((input) => input.id)} onAdd={onAdd} />
+        <BodyText>Choose a workflow.</BodyText>
+        {workflowProblem !== null && (
+          <BodyText tone="secondary">{workflowProblem}</BodyText>
         )}
       </BuildCard>
     );
@@ -647,7 +463,7 @@ export function InputsCard({
         >
           {undeclared.map((input) => (
             <div key={input.id} className={classes.item}>
-              <div className={classes.itemHead}>
+              <Group gap="4px 12px" align="baseline" justify="space-between">
                 <span className={classes.id}>{input.id}</span>
                 {!disabled && (
                   <Button
@@ -659,7 +475,7 @@ export function InputsCard({
                     Remove
                   </Button>
                 )}
-              </div>
+              </Group>
             </div>
           ))}
         </CardPart>

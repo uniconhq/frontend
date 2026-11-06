@@ -11,6 +11,7 @@ import { scopeName } from '@/lib/scope-name';
 import { contestPath, orgPath, taskPath } from '@/lib/organiser-paths';
 import type { Me, ScopeNames } from '@/api/types';
 import { PageLink } from '@/ui/PageLink';
+import { Group, Stack } from '@/ui/layout';
 import classes from './AccountPage.module.css';
 
 /** Each role as a word, not as the name the backend sends. */
@@ -38,11 +39,11 @@ export function AccountPage() {
   const forge = useForgeUrl();
 
   return (
-    <div className={classes.page}>
+    <Stack gap="md">
       <PageTitle>Account</PageTitle>
 
       <Card>
-        <div className={classes.profile}>
+        <Group gap={14} wrap="nowrap">
           <Avatar src={user.avatar_url} name={user.name ?? user.username} size={56} />
           <div className={classes.fields}>
             <SectionTitle>{user.name ?? user.username}</SectionTitle>
@@ -53,7 +54,7 @@ export function AccountPage() {
               {user.email ?? 'No email address on record'}
             </BodyText>
           </div>
-        </div>
+        </Group>
         {me.degraded && (
           <BodyText tone="secondary">
             Forgejo is not answering, so your name, avatar and email may be missing.
@@ -68,7 +69,7 @@ export function AccountPage() {
 
       {me.roles.length > 0 && (
         <Card>
-          <div className={classes.stack}>
+          <Stack gap="sm">
             <SectionTitle>Roles</SectionTitle>
             <ul className={classes.roles}>
               {me.roles.map(({ names, role }) => (
@@ -78,12 +79,12 @@ export function AccountPage() {
                 </li>
               ))}
             </ul>
-          </div>
+          </Stack>
         </Card>
       )}
 
       <Card>
-        <div className={classes.stack}>
+        <Stack gap="sm">
           <SectionTitle>Security</SectionTitle>
           <BodyText size="md">
             Your account is kept in Forgejo, where you change your password, email
@@ -98,12 +99,12 @@ export function AccountPage() {
             </div>
           )}
           <SessionList />
-        </div>
+        </Stack>
       </Card>
 
       <Card>
         <DangerZone />
       </Card>
-    </div>
+    </Stack>
   );
 }

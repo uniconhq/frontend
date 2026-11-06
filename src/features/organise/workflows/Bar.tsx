@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import type { WorkflowPage } from '@/api/types';
 import { Select } from '@/ui/Select';
+import { Group } from '@/ui/layout';
 import { workflowPath } from '@/lib/organiser-paths';
 import { latestVersion, versionNumber } from './versions';
 import classes from './workflows.module.css';
@@ -58,7 +59,7 @@ export function WorkflowBar({
   return (
     <>
       <div className={classes.barFrame} data-workflow-bar>
-        <div className={classes.bar} role="toolbar" aria-label="The workflow">
+        <Group gap="8px 16px" role="toolbar" aria-label="The workflow">
           {options.length > 0 && (
             <div className={classes.switch}>
               <Select
@@ -80,12 +81,12 @@ export function WorkflowBar({
           )}
           {status !== undefined && <div>{status}</div>}
           {tools !== undefined && (
-            <div className={classes.tools} role="group" aria-label="Editing">
+            <Group gap={8} role="group" aria-label="Editing">
               {tools}
-            </div>
+            </Group>
           )}
           <div className={classes.barActions}>{children}</div>
-        </div>
+        </Group>
       </div>
       {version !== null && page.yanked?.[version] && (
         <p className={classes.where}>

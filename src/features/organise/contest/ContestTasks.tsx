@@ -7,7 +7,7 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { IconButton } from '@/ui/IconButton';
 import { Chip } from '@/ui/Chip';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { ListCard, type ListRow } from '@/ui/ListCard';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
@@ -29,8 +29,8 @@ import { EntryLine, TaskEntryDialog } from './TaskEntry';
 import { STANDINGS, entrySentence, labelOf, useTaskTitles } from './task-entry';
 import { FIRST_KIND, STARTER, startOn, type Kind } from '../task/new-task';
 import { TaskKind } from '../task/TaskKind';
-import shared from '../organise.module.css';
 import { PageLink } from '@/ui/PageLink';
+import { Group } from '@/ui/layout';
 import { taskCardPath } from '@/lib/sections';
 import classes from './contest.module.css';
 
@@ -125,7 +125,7 @@ function rowOf(
     ),
     action:
       changing === null || (!changing.movable && !standing.withdrawn) ? undefined : (
-        <div className={classes.moves}>
+        <Group gap={4} align="stretch" wrap="nowrap">
           {standing.withdrawn && (
             <Button
               size="xs"
@@ -152,7 +152,7 @@ function rowOf(
               />
             </>
           )}
-        </div>
+        </Group>
       ),
   };
 }
@@ -396,35 +396,25 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
 
   return (
     <div ref={card}>
-      <Modal
+      <ConfirmDialog
         opened={asked !== null}
         onClose={() => setAsked(null)}
         title={
           asked === null ? '' : `Move ${asked.label} ${asked.by < 0 ? 'up' : 'down'}?`
         }
+        confirm={asked === null ? '' : asked.by < 0 ? 'Move it up' : 'Move it down'}
+        loading={change.pending}
+        onConfirm={() => asked !== null && void move(asked.task, asked.by)}
       >
         {asked !== null && (
-          <div className={shared.stack}>
-            <BodyText>
-              The contest has started, so entrants see this at once: {asked.label}{' '}
-              becomes {asked.otherLetter}, and {asked.other} becomes {asked.letter}. The
-              leaderboards, the contest’s page and every announcement or question that
-              names a task by its letter go by the new letters.
-            </BodyText>
-            <div className={shared.actions}>
-              <Button
-                loading={change.pending}
-                onClick={() => void move(asked.task, asked.by)}
-              >
-                {asked.by < 0 ? 'Move it up' : 'Move it down'}
-              </Button>
-              <Button variant="secondary" onClick={() => setAsked(null)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
+          <BodyText>
+            The contest has started, so entrants see this at once: {asked.label} becomes{' '}
+            {asked.otherLetter}, and {asked.other} becomes {asked.letter}. The
+            leaderboards, the contest’s page and every announcement or question that
+            names a task by its letter go by the new letters.
+          </BodyText>
         )}
-      </Modal>
+      </ConfirmDialog>
       <TaskEntryDialog
         org={org}
         contest={contest}

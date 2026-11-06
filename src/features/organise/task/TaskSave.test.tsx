@@ -11,6 +11,7 @@ import {
   publishedTask,
   repoFiles,
   unchanged,
+  published,
 } from '@/test/organiser';
 
 const WRITE = `${TASK_API}/files/:path`;
@@ -117,14 +118,14 @@ async function toPublications() {
 describe('saving a task file', () => {
   it('shows the publication and what it does, then refetches the task', async () => {
     const { reads, sent } = taskBackend(() =>
-      HttpResponse.json({
-        number: 3,
-        grading_changed: true,
-        changes: ['The time limit changes.'],
-        notes: [],
-        regraded: 4,
-        effect: REGRADED,
-      }),
+      HttpResponse.json(
+        published({
+          grading_changed: true,
+          changes: ['The time limit changes.'],
+          regraded: 4,
+          effect: REGRADED,
+        }),
+      ),
     );
 
     const before = await readThenEditAndSave(reads);
@@ -158,16 +159,7 @@ describe('saving a task file', () => {
   });
 
   it('says when a publication moves nobody’s result, in the same parts and never that grading is unchanged', async () => {
-    taskBackend(() =>
-      HttpResponse.json({
-        number: 3,
-        grading_changed: false,
-        changes: [],
-        notes: [],
-        regraded: 0,
-        effect: unchanged,
-      }),
-    );
+    taskBackend(() => HttpResponse.json(published()));
 
     await editAndSave();
 
@@ -184,21 +176,19 @@ describe('saving a task file', () => {
 
   it('says what a first publication does: nothing runs again, and entrants read it from its release', async () => {
     taskBackend(() =>
-      HttpResponse.json({
-        number: 1,
-        grading_changed: false,
-        changes: [],
-        notes: [],
-        regraded: 0,
-        effect: {
-          ...unchanged,
-          runs_again: [
-            "No submission runs again: this is the task's first publication.",
-          ],
-          scores: ['Points: main is worth up to 100.'],
-          reading: ['Entrants read the task from its release.'],
-        },
-      }),
+      HttpResponse.json(
+        published({
+          number: 1,
+          effect: {
+            ...unchanged,
+            runs_again: [
+              "No submission runs again: this is the task's first publication.",
+            ],
+            scores: ['Points: main is worth up to 100.'],
+            reading: ['Entrants read the task from its release.'],
+          },
+        }),
+      ),
     );
 
     await editAndSave();
@@ -216,17 +206,18 @@ describe('saving a task file', () => {
 
   it('shows the notes a publication makes under a label that says what they are', async () => {
     taskBackend(() =>
-      HttpResponse.json({
-        number: 3,
-        grading_changed: true,
-        changes: ['The time limit changes.'],
-        notes: [
-          'sum shows its hidden results on 15 October 2026, 09:00.',
-          'The leaderboard Practice ranks by points but counts none from sum.',
-        ],
-        regraded: 4,
-        effect: REGRADED,
-      }),
+      HttpResponse.json(
+        published({
+          grading_changed: true,
+          changes: ['The time limit changes.'],
+          notes: [
+            'sum shows its hidden results on 15 October 2026, 09:00.',
+            'The leaderboard Practice ranks by points but counts none from sum.',
+          ],
+          regraded: 4,
+          effect: REGRADED,
+        }),
+      ),
     );
 
     await editAndSave();
@@ -242,16 +233,7 @@ describe('saving a task file', () => {
   });
 
   it('says nothing of notes when a publication has none', async () => {
-    taskBackend(() =>
-      HttpResponse.json({
-        number: 3,
-        grading_changed: false,
-        changes: [],
-        notes: [],
-        regraded: 0,
-        effect: unchanged,
-      }),
-    );
+    taskBackend(() => HttpResponse.json(published()));
 
     await editAndSave();
 
@@ -292,14 +274,14 @@ describe('saving a task file', () => {
         .json()
         .then((body) =>
           (body as { confirm: boolean }).confirm
-            ? HttpResponse.json({
-                number: 3,
-                grading_changed: true,
-                changes: ['The time limit changes.'],
-                notes: [],
-                regraded: 4,
-                effect: REGRADED,
-              })
+            ? HttpResponse.json(
+                published({
+                  grading_changed: true,
+                  changes: ['The time limit changes.'],
+                  regraded: 4,
+                  effect: REGRADED,
+                }),
+              )
             : problem(409, 'confirmation_required', {
                 detail:
                   'The contest is running, so this save asks before it publishes. Publish it, or keep it as a draft.',

@@ -5,9 +5,3 @@
   max-width: 420px;
   padding-top: 24px;
 }
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}

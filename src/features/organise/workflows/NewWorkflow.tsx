@@ -6,6 +6,7 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Modal } from '@/ui/Modal';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { Group } from '@/ui/layout';
 import { useMe } from '@/session';
 import { workflowPath } from '@/lib/organiser-paths';
 import { OwnerAndName } from './OwnerAndName';
@@ -36,14 +37,14 @@ function NewWorkflowForm({ onCancel }: { onCancel: () => void }) {
         boxes.
       </BodyText>
       {error !== null && <ErrorBlock error={error} compact heading="Couldn’t create" />}
-      <div className={classes.actions}>
+      <Group gap={8} align="stretch">
         <Button type="submit" loading={create.isPending} disabled={name.trim() === ''}>
           Create workflow
         </Button>
         <Button variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
-      </div>
+      </Group>
     </form>
   );
 }

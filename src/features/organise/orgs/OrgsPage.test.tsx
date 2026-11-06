@@ -2,25 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
-import { server, signedIn, someone } from '@/test/server';
+import { server, signedIn, signedInAs, someone } from '@/test/server';
 import { TASK_API } from '@/test/organiser';
 
 describe('the org list', () => {
   it('lists each org the session names, each linking to its page', async () => {
     server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            ...someone.roles,
-            {
-              names: { org: 'beta', contest: 'cup', task: 'sum' },
-              role: 'observer',
-            },
-          ],
-          orgs: ['acme', 'beta'],
-        }),
-      ),
+      ...signedInAs('admin', {
+        roles: [
+          ...someone.roles,
+          { names: { org: 'beta', contest: 'cup', task: 'sum' }, role: 'observer' },
+        ],
+        orgs: ['acme', 'beta'],
+      }),
     );
     renderApp('/orgs');
 
@@ -35,11 +29,7 @@ describe('the org list', () => {
   });
 
   it('offers a new org, and says so when there are none yet', async () => {
-    server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({ ...someone, roles: [], orgs: [] }),
-      ),
-    );
+    server.use(...signedInAs(null, { roles: [], orgs: [] }));
     renderApp('/orgs');
 
     expect(

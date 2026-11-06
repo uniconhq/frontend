@@ -7,9 +7,9 @@ import { isoOf, localOf } from '../forms/times';
 import { CONTEST_SECTIONS } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { home } from '@/test/contestant';
-import { holding, taskMay } from '@/test/may';
+import { taskMay } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
+import { problem, server, signedIn, signedInAs } from '@/test/server';
 import {
   CONTEST_API,
   contestSettings,
@@ -19,8 +19,9 @@ import {
   standingList,
   standings,
   taskList,
-  unchanged,
+  published,
 } from '@/test/organiser';
+import { workflowItem } from '@/test/workflows';
 
 const CONTEST = '/orgs/acme/contests/spring';
 
@@ -476,8 +477,7 @@ describe("the contest's tasks", () => {
 
   it('shows someone refused the standings the tasks the server lists for them', async () => {
     server.use(
-      signedIn,
-      ...holding(null),
+      ...signedInAs(null),
       http.get(`${CONTEST_API}/tasks`, () =>
         HttpResponse.json([{ name: 'sum', may_manage: true }]),
       ),
@@ -692,7 +692,7 @@ describe("a task's place in the contest, changed from its row", () => {
   });
 
   it('offers an observer the line as text, with no way to change or move a task', async () => {
-    server.use(signedIn, ...holding('observer'), standingList, ...repoFiles);
+    server.use(...signedInAs('observer'), standingList, ...repoFiles);
     renderApp(CONTEST);
 
     const row = await screen.findByRole('listitem', { name: 'A · sort' });
@@ -942,20 +942,19 @@ describe('creating a task', () => {
       http.get('/api/v1/workflow-search', () =>
         HttpResponse.json({
           items: [
-            {
+            workflowItem({
               owner: 'unicon',
               name: 'classic',
               versions: ['v4'],
               editable: false,
               visibility: 'public',
-            },
-            {
+            }),
+            workflowItem({
               owner: 'unicon',
               name: 'classic-folder',
-              versions: ['v1'],
               editable: false,
               visibility: 'public',
-            },
+            }),
           ],
           next: null,
         }),
@@ -993,14 +992,7 @@ describe('creating a task', () => {
         '/api/v1/orgs/acme/contests/spring/tasks/max/save',
         async ({ request }) => {
           saves.push((await request.json()) as (typeof saves)[number]);
-          return HttpResponse.json({
-            number: 1,
-            grading_changed: true,
-            changes: [],
-            notes: [],
-            regraded: 0,
-            effect: unchanged,
-          });
+          return HttpResponse.json(published({ number: 1, grading_changed: true }));
         },
       ),
     );
@@ -1042,13 +1034,13 @@ describe('creating a task', () => {
       http.get('/api/v1/workflow-search', () =>
         HttpResponse.json({
           items: [
-            {
+            workflowItem({
               owner: 'unicon',
               name: 'classic',
               versions: ['v2'],
               editable: false,
               visibility: 'public',
-            },
+            }),
           ],
           next: null,
         }),

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { useServerClock } from '@/api/use-server-time';
@@ -8,8 +8,7 @@ import { Card } from '@/ui/Card';
 import { PageLink } from '@/ui/PageLink';
 import { Page, PageHeader } from '@/ui/Page';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { taskPoints } from '@/ui/leaderboards/points';
 import { ShownValue } from '@/ui/number/ShownValue';
 import { formatExact } from '@/lib/exact';
@@ -17,20 +16,21 @@ import { LeaderboardTable } from '@/ui/leaderboards/table';
 import { taskPagePath } from '@/lib/contest-paths';
 import { contestPath } from '@/lib/organiser-paths';
 import { useContestParams } from '@/lib/route-params';
-import { contestViewSectionPath, entrantGradingsPath } from '@/lib/sections';
+import { contestViewSectionPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { ContestAnnouncements } from './threads/AnnouncementList';
 import { useMyQuestions } from './threads/questions';
 import { BySession } from './BySession';
 import { useAnchor } from '@/ui/anchor';
 import { Countdown } from '@/ui/Countdown';
+import { Group } from '@/ui/layout';
 import { entryPollEvery } from './entry/poll';
 import { YourEntry } from './entry/YourEntry';
 import { notIn, TASK_STANDING } from './entry/not-in';
 import { SignInButtons, SignInPrompt } from './SignInPrompt';
 import { labelOf } from '@/lib/task-names';
-import { submissionHref } from './submit/submission-param';
-import { taskTimeLines } from './time-left';
+import { countedSubmissionTo } from './submit/submission-param';
+import { contestCountdown, taskTimeLines } from './time-left';
 import classes from './contest.module.css';
 
 /** How often a standing on the home is read again, as the leaderboards page is. */
@@ -89,11 +89,42 @@ function Standing({
 }
 
 /**
- * A contest's released tasks as a signed-in person works from them, in the
- * contest's order: each a link to its page, and where it stands for them,
- * the time left on it counted down by the server's clock.
+ * A contest's released tasks in the contest's order, each a link to its page,
+ * with `after` beside it on its line.
  */
-function TaskList({
+function TaskList<T extends PublicTask>({
+  org,
+  contest,
+  tasks,
+  after,
+}: {
+  org: string;
+  contest: string;
+  tasks: T[];
+  after?: (task: T) => ReactNode;
+}) {
+  if (tasks.length === 0) {
+    return <BodyText tone="secondary">No tasks are released yet.</BodyText>;
+  }
+  return (
+    <ul className={classes.tasks} aria-label="Tasks">
+      {tasks.map((task) => (
+        <li key={task.name} className={classes.task}>
+          <span className={classes.label}>{labelOf(task)}</span>
+          <PageLink to={taskPagePath(org, contest, task.name)}>{task.title}</PageLink>
+          {after?.(task)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * The tasks as a signed-in person works from them: with their points and
+ * where each stands for them, the time left counted down by the server's
+ * clock.
+ */
+function EntrantTaskList({
   org,
   contest,
   tasks,
@@ -108,15 +139,13 @@ function TaskList({
   standing: ContestHome['standing'];
 }) {
   const { at, measured } = useServerClock();
-  if (tasks.length === 0) {
-    return <BodyText tone="secondary">No tasks are released yet.</BodyText>;
-  }
   return (
-    <ul className={classes.tasks} aria-label="Tasks">
-      {tasks.map((task) => (
-        <li key={task.name} className={classes.task}>
-          <span className={classes.label}>{labelOf(task)}</span>
-          <PageLink to={taskPagePath(org, contest, task.name)}>{task.title}</PageLink>
+    <TaskList
+      org={org}
+      contest={contest}
+      tasks={tasks}
+      after={(task) => (
+        <>
           {taskPoints(task.name, standing).map((points) => (
             <span key={points.board}>
               <ShownValue number={points.number} decimals={points.decimals} />
@@ -124,43 +153,18 @@ function TaskList({
             </span>
           ))}
           <Standing task={task} at={at} counting={measured} notApproved={notApproved} />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** A public contest's released tasks as a visitor reads them: each a link to its statement. */
-function PublicTaskList({
-  org,
-  contest,
-  tasks,
-}: {
-  org: string;
-  contest: string;
-  tasks: PublicTask[];
-}) {
-  if (tasks.length === 0) {
-    return <BodyText tone="secondary">No tasks are released yet.</BodyText>;
-  }
-  return (
-    <ul className={classes.tasks} aria-label="Tasks">
-      {tasks.map((task) => (
-        <li key={task.name} className={classes.task}>
-          <span className={classes.label}>{labelOf(task)}</span>
-          <PageLink to={taskPagePath(org, contest, task.name)}>{task.title}</PageLink>
-        </li>
-      ))}
-    </ul>
+        </>
+      )}
+    />
   );
 }
 
 function Dates({ start, end }: { start: string; end: string }) {
   return (
-    <div className={classes.dates}>
+    <Group gap={24} align="stretch">
       <BodyText tone="secondary">Starts {formatDateTime(new Date(start))}</BodyText>
       <BodyText tone="secondary">Ends {formatDateTime(new Date(end))}</BodyText>
-    </div>
+    </Group>
   );
 }
 
@@ -174,13 +178,6 @@ function LeaderboardCard({
   contest: string;
   standing: ContestHome['standing'];
 }) {
-  // Staff, as the server says on each board, open the entrant's submissions
-  // to the task; anyone else, who reads only their own row, their own
-  // submission.
-  const open = (staff: boolean) => (task: string, number: number, entrant: string) =>
-    staff
-      ? entrantGradingsPath(org, contest, task, entrant)
-      : `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
   const visible = standing.filter((board) => board.rows.length > 0);
   if (visible.length === 0) return null;
   return (
@@ -191,7 +188,7 @@ function LeaderboardCard({
           <LeaderboardTable
             key={board.key}
             board={board}
-            submissionTo={open(board.staff)}
+            submissionTo={countedSubmissionTo(org, contest, board.staff)}
             titleTo={`${contestViewSectionPath(org, contest, 'boards')}/${encodeURIComponent(board.key)}`}
           />
         ))}
@@ -280,10 +277,13 @@ function SignedInHome({ org, contest }: { org: string; contest: string }) {
     });
   }, [queryClient, org, contest]);
 
-  if (view.state === 'loading') return <PageSkeleton rows={4} />;
-  if (view.state === 'error')
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
-  return <Home org={org} contest={contest} home={view.data} onBoundary={readAgain} />;
+  return (
+    <Loaded view={view} rows={4}>
+      {(home) => (
+        <Home org={org} contest={contest} home={home} onBoundary={readAgain} />
+      )}
+    </Loaded>
+  );
 }
 
 /**
@@ -338,11 +338,8 @@ function Home({
       <Card>
         <div className={classes.stack}>
           <Countdown
-            start={home.start}
-            end={home.end}
-            now={home.now}
+            {...contestCountdown(home.start, home.end, home.now)}
             onBoundary={onBoundary}
-            large
           />
           <Dates start={home.start} end={home.end} />
         </div>
@@ -351,7 +348,7 @@ function Home({
       <Card>
         <div className={classes.stack}>
           <SectionTitle>Tasks</SectionTitle>
-          <TaskList
+          <EntrantTaskList
             org={org}
             contest={contest}
             tasks={home.tasks}
@@ -389,36 +386,36 @@ function PublicHome({ org, contest }: { org: string; contest: string }) {
     }),
   );
 
-  if (view.state === 'loading') return <PageSkeleton rows={4} />;
-  if (view.state === 'error') {
-    if (view.error.status === 404) {
-      return <SignInPrompt title="Sign in to see this contest" />;
-    }
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
+  if (view.state === 'error' && view.error.status === 404) {
+    return <SignInPrompt title="Sign in to see this contest" />;
   }
-
-  const found = view.data;
   return (
-    <Page>
-      <PageHeader title={found.name}>
-        {found.description !== '' && <BodyText size="md">{found.description}</BodyText>}
-      </PageHeader>
-      <Card>
-        <div className={classes.stack}>
-          <Countdown start={found.start} end={found.end} large />
-          <Dates start={found.start} end={found.end} />
-          <BodyText>Sign in to register for this contest.</BodyText>
-          <SignInButtons />
-        </div>
-      </Card>
-      <Card>
-        <div className={classes.stack}>
-          <SectionTitle>Tasks</SectionTitle>
-          <PublicTaskList org={org} contest={contest} tasks={found.tasks} />
-        </div>
-      </Card>
-      <LeaderboardsLink org={org} contest={contest} />
-    </Page>
+    <Loaded view={view} rows={4}>
+      {(found) => (
+        <Page>
+          <PageHeader title={found.name}>
+            {found.description !== '' && (
+              <BodyText size="md">{found.description}</BodyText>
+            )}
+          </PageHeader>
+          <Card>
+            <div className={classes.stack}>
+              <Countdown {...contestCountdown(found.start, found.end)} />
+              <Dates start={found.start} end={found.end} />
+              <BodyText>Sign in to register for this contest.</BodyText>
+              <SignInButtons />
+            </div>
+          </Card>
+          <Card>
+            <div className={classes.stack}>
+              <SectionTitle>Tasks</SectionTitle>
+              <TaskList org={org} contest={contest} tasks={found.tasks} />
+            </div>
+          </Card>
+          <LeaderboardsLink org={org} contest={contest} />
+        </Page>
+      )}
+    </Loaded>
   );
 }
 

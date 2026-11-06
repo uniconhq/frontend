@@ -1,78 +1,61 @@
 import { useEffect, useRef } from 'react';
 import { BY_DEVICE, useServerClock } from '@/api/use-server-time';
 import { BodyText } from '@/ui/BodyText';
-import { formatDuration, formatWhen } from '@/lib/time';
+import { Group } from '@/ui/layout';
 import classes from './Countdown.module.css';
 
-type Phase = 'before' | 'running' | 'ended';
+export type CountdownLine = { key: string; text: string };
 
 /**
- * How long until the contest starts, or until it ends, by the server's clock
- * and never the browser's, each said with what it counts to. Each task
- * closes at its own time, which its row says; this counts the contest as a
- * whole. Asking for the server's time is what measures how far this
- * browser's clock is out, so until that answer is in it says when the contest
- * starts or ends rather than counting, by where `now` says it stood; a server that did not answer leaves
- * the browser's clock to count by, and the countdown says so. `onBoundary` is
- * called as the count crosses the start or the end, which is when what the
- * page shows changes on the server too. `large` is for the first thing a
- * contest's own page answers.
+ * A countdown by the server's clock, never the browser's. `lines` says it at
+ * `at`; until the server's time is in (`counting` false) they should say only
+ * when each moment falls. A server that did not answer leaves the browser's
+ * clock to count by, and it says so. `onBoundary` is called as `phaseAt`
+ * changes, which is when the page changes on the server too. `row` sets the
+ * lines side by side; otherwise they lead a contest's page.
  */
 export function Countdown({
-  start,
-  end,
-  now,
+  label,
+  phaseAt,
+  lines,
   onBoundary,
-  large = false,
+  row = false,
 }: {
-  start: string;
-  end: string;
-  /** The server's time when the page was read, which says where the contest stands until the count begins. */
-  now?: string;
+  label: string;
+  phaseAt: (at: number) => string;
+  lines: (at: number, counting: boolean) => CountdownLine[];
   onBoundary?: () => void;
-  large?: boolean;
+  row?: boolean;
 }) {
   const { at, measured, byDevice } = useServerClock();
-  const startsAt = Date.parse(start);
-  const endsAt = Date.parse(end);
-  const phaseAt = (moment: number): Phase =>
-    moment < startsAt ? 'before' : moment < endsAt ? 'running' : 'ended';
   const phase = phaseAt(at);
 
-  const last = useRef<Phase | null>(null);
+  const last = useRef<string | null>(null);
   useEffect(() => {
     if (!measured) return;
     if (last.current !== null && last.current !== phase) onBoundary?.();
     last.current = phase;
   }, [measured, phase, onBoundary]);
 
-  const when = (moment: number) => formatWhen(new Date(moment), new Date(at));
-  let text: string;
-  if (!measured) {
-    // Where the contest stands by the server's word at the read, never by
-    // this browser's clock; with no such word, both of its times.
-    const read = now === undefined ? null : phaseAt(Date.parse(now));
-    text =
-      read === 'before'
-        ? `Contest starts at ${when(startsAt)}`
-        : read === 'running'
-          ? `Contest ends at ${when(endsAt)}`
-          : read === 'ended'
-            ? 'Contest ended'
-            : `Contest runs from ${when(startsAt)} to ${when(endsAt)}`;
-  } else {
-    text =
-      phase === 'before'
-        ? `Contest starts in ${formatDuration(startsAt - at)}`
-        : phase === 'running'
-          ? `Contest ends in ${formatDuration(endsAt - at)}`
-          : 'Contest ended';
-  }
-
+  const shown = lines(at, measured);
+  if (shown.length === 0) return null;
+  const spans = shown.map(({ key, text }) => (
+    <span key={key} className={row ? classes.line : classes.large}>
+      {text}
+    </span>
+  ));
+  const device = byDevice && <BodyText tone="secondary">{BY_DEVICE}</BodyText>;
+  if (row)
+    return (
+      <Group role="timer" aria-label={label} gap="4px 24px" align="baseline">
+        {spans}
+        {device}
+      </Group>
+    );
   return (
-    <div role="timer" aria-label="Contest countdown">
-      <span className={large ? classes.large : classes.line}>{text}</span>
-      {byDevice && <BodyText tone="secondary">{BY_DEVICE}</BodyText>}
+    <div role="timer" aria-label={label}>
+      {spans}
+      {device}
     </div>
   );
 }

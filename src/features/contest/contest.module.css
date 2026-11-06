@@ -1,9 +1,3 @@
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
 .stack {
   display: flex;
   flex-direction: column;
@@ -20,25 +14,11 @@
   background: var(--unicon-hover);
 }
 
-/* Buttons and links side by side, such as signing in and creating an account. */
-.actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
 .form {
   display: flex;
   flex-direction: column;
   gap: 10px;
   max-width: 420px;
-}
-
-.dates {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
 }
 
 .tasks {
@@ -84,25 +64,6 @@
   .standing {
     grid-column: 2;
   }
-}
-
-/*
- * The time left on a task, at the top of its page: a line under the title in
- * the body font, its digits each as wide so the count does not shift as it
- * ticks.
- */
-.timeLeft {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 24px;
-}
-
-.timeLine {
-  font-size: var(--mantine-font-size-lg);
-  font-weight: 500;
-  color: var(--unicon-text-body);
-  font-variant-numeric: tabular-nums;
 }
 
 /* A page's or a card's links, such as asking a question. */

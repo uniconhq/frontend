@@ -2,9 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { afterAnswers, problem, server, signedIn } from '@/test/server';
+import { afterAnswers, problem, server, signedIn, signedInAs } from '@/test/server';
 import {
   CONTEST_API,
   TASK_API,
@@ -14,6 +13,7 @@ import {
   settingsOf,
   taskList,
   taskState,
+  fileContent,
 } from '@/test/organiser';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 
@@ -160,14 +160,11 @@ describe("a task's files, each on its own form (M51)", () => {
  * The contest's settings as they are when the pages cannot read them: no
  * longer YAML, so its admin fixes them as text on its Settings page.
  */
-const BROKEN = {
+const BROKEN = fileContent({
   path: 'contest.yaml',
-  encoding: 'utf-8' as const,
   content: 'name: Spring\nstart: [\n',
   token: 'token-broken',
-  upload: null,
-  version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-};
+});
 
 /** The contest's settings as the forms read them: not as settings. */
 const UNREADABLE = http.get(`${CONTEST_API}/settings`, () =>
@@ -430,14 +427,13 @@ describe('mending settings that do not read', () => {
       publicationList,
       http.get(TASK_FILE, ({ params }) =>
         params['path'] === 'task.yaml'
-          ? HttpResponse.json({
-              path: 'task.yaml',
-              encoding: 'utf-8',
-              content: BROKEN_TASK,
-              token: 'token-broken',
-              upload: null,
-              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-            })
+          ? HttpResponse.json(
+              fileContent({
+                path: 'task.yaml',
+                content: BROKEN_TASK,
+                token: 'token-broken',
+              }),
+            )
           : undefined,
       ),
       http.put(TASK_FILE, answer),
@@ -508,7 +504,7 @@ describe('mending settings that do not read', () => {
 
   it('offers a manager the text to mend, as the forge lets them write it', async () => {
     brokenBackend(() => HttpResponse.json({}));
-    server.use(signedIn, ...holding('manager'));
+    server.use(...signedInAs('manager'));
     renderApp(TASK_SETTINGS);
 
     expect(
@@ -519,7 +515,7 @@ describe('mending settings that do not read', () => {
 
   it('shows anyone else the text to read, and who may mend it', async () => {
     brokenBackend(() => HttpResponse.json({}));
-    server.use(signedIn, ...holding('observer'));
+    server.use(...signedInAs('observer'));
     renderApp(TASK_SETTINGS);
 
     expect(

@@ -40,12 +40,6 @@
   color: var(--unicon-text-body);
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
 /* A folder as a small tree. */
 .tree {
   list-style: none;

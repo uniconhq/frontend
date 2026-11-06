@@ -7,6 +7,7 @@ import { CardGrid, HubCard } from '@/ui/HubCard';
 import { PageLink } from '@/ui/PageLink';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Stack } from '@/ui/layout';
 import {
   CreateAccountLink,
   currentPath,
@@ -77,7 +78,7 @@ export function HomePage() {
   const location = useLocation();
 
   return (
-    <div className={classes.page}>
+    <Stack gap="md">
       <PageTitle>Unicon</PageTitle>
       <BodyText size="md">
         Enter a contest, submit your work to its tasks and see how each submission is
@@ -99,6 +100,6 @@ export function HomePage() {
       {session.status === 'signed-in' && <SignedInHome />}
 
       <ServerClock />
-    </div>
+    </Stack>
   );
 }

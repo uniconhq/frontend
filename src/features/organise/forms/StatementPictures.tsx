@@ -2,6 +2,7 @@ import type { TreeEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Chip } from '@/ui/Chip';
+import { Group } from '@/ui/layout';
 import { formatSize } from '@/lib/size';
 import shared from '../organise.module.css';
 import type { StagedPicture } from './statement-pictures';
@@ -56,7 +57,7 @@ export function StatementPictures({
     <ul className={shared.named} aria-label="Pictures">
       {listed.map(({ name, size, staged: change }) => (
         <li key={name} aria-label={name}>
-          <div className={shared.actions}>
+          <Group gap="xs">
             <span>
               {name}
               {size !== null && `, ${formatSize(size)}`}
@@ -91,7 +92,7 @@ export function StatementPictures({
                   Remove
                 </Button>
               ))}
-          </div>
+          </Group>
         </li>
       ))}
     </ul>

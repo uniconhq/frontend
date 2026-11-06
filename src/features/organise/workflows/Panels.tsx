@@ -13,6 +13,7 @@ import { Checkbox } from '@/ui/Checkbox';
 import { FileDrop } from '@/ui/FileDrop';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
+import { Stack } from '@/ui/layout';
 import { NumberText, numberText } from './yaml-doc';
 import {
   clearPort,
@@ -333,7 +334,7 @@ function PortRow({
         : null;
   if (fixed !== null) {
     return (
-      <div className={classes.portValue}>
+      <Stack gap={4}>
         <BodyText size="sm">
           <strong>{label}</strong> {fixed}
         </BodyText>
@@ -354,7 +355,7 @@ function PortRow({
             </Button>
           </div>
         </EditOnly>
-      </div>
+      </Stack>
     );
   }
   const wired = value?.kind === 'wire' ? value.ref : null;

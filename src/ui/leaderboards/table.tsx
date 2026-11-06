@@ -1,3 +1,4 @@
+import { Stack } from '@mantine/core';
 import type { components } from '@/api/schema';
 import { formatExact } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
@@ -30,7 +31,7 @@ export function LeaderboardTable({
 }) {
   const partial = board.dropped.length > 0;
   return (
-    <div className={classes.board}>
+    <Stack gap={8}>
       <table className={classes.table} aria-label={board.title || board.key}>
         <caption className={classes.caption}>
           {titleTo === undefined ? (
@@ -95,7 +96,7 @@ export function LeaderboardTable({
         <BodyText>Held from {formatDateTime(new Date(board.held_from))}.</BodyText>
       )}
       {board.rows.length === 0 && <BodyText tone="secondary">No rows.</BodyText>}
-    </div>
+    </Stack>
   );
 }
 

@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { $api } from '@/api/query';
 import type { FileChange, FileContent } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { RadioGroup } from '@/ui/RadioGroup';
+import { Group } from '@/ui/layout';
 import { formatSize } from '@/lib/size';
 import { formatDateTime } from '@/lib/time';
+import { useFocusOnShow } from '@/lib/use-focus-on-show';
 import { fileQuery, type Place } from './place';
 import shared from '../organise.module.css';
 import formClasses from '../forms/forms.module.css';
@@ -66,10 +68,7 @@ export function FilesMerge({
   onSave: (overwrite: ReadonlySet<string>) => void;
   onDrop: () => void;
 }) {
-  const panel = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    panel.current?.focus();
-  }, []);
+  const panel = useFocusOnShow<HTMLDivElement>();
   const [choices, setChoices] = useState<Record<string, 'mine' | 'theirs'>>({});
   const [warning, setWarning] = useState(false);
   const task = { org: place.org, contest: place.contest, task: place.task };
@@ -132,7 +131,7 @@ export function FilesMerge({
           </li>
         ))}
       </ul>
-      <div className={shared.actions}>
+      <Group gap="xs">
         <Button
           loading={busy}
           onClick={() =>
@@ -153,35 +152,25 @@ export function FilesMerge({
         <Button variant="secondary" disabled={busy} onClick={onDrop}>
           Discard my changes
         </Button>
-      </div>
-      <Modal
+      </Group>
+      <ConfirmDialog
         opened={warning}
         onClose={() => setWarning(false)}
         title="Save yours over theirs?"
+        confirm="Save yours over theirs"
+        variant="danger"
+        loading={busy}
+        onConfirm={() => {
+          setWarning(false);
+          onSave(new Set(files.map((file) => file.path)));
+        }}
       >
-        <div className={shared.stack}>
-          <BodyText>
-            This throws away what the other person saved in{' '}
-            {files.map((file) => file.label).join(', ')}. Their versions stay in the
-            task’s history. Picking a side for each file keeps the rest of their work.
-          </BodyText>
-          <div className={shared.actions}>
-            <Button
-              variant="danger"
-              loading={busy}
-              onClick={() => {
-                setWarning(false);
-                onSave(new Set(files.map((file) => file.path)));
-              }}
-            >
-              Save yours over theirs
-            </Button>
-            <Button variant="secondary" onClick={() => setWarning(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        <BodyText>
+          This throws away what the other person saved in{' '}
+          {files.map((file) => file.label).join(', ')}. Their versions stay in the
+          task’s history. Picking a side for each file keeps the rest of their work.
+        </BodyText>
+      </ConfirmDialog>
     </div>
   );
 }

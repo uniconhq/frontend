@@ -7,13 +7,13 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Checkbox } from '@/ui/Checkbox';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { useFallbackPoll } from '@/live';
 import { useOrgParam } from '@/lib/route-params';
 import { ORG_SECTIONS, sectionOf } from '@/lib/sections';
@@ -24,6 +24,7 @@ import { contestPath, taskPath } from '@/lib/organiser-paths';
 import { useEntrantName } from '../entrants/names';
 import { useTaskTitles } from '../contest/task-entry';
 import classes from '@/ui/threads/threads.module.css';
+import { Group, Stack } from '@/ui/layout';
 
 const INBOX = '/api/v1/orgs/{org}/clarifications';
 const OF_CONTEST = '/api/v1/orgs/{org}/contests/{contest}/clarifications';
@@ -188,7 +189,7 @@ function ClarificationCard({
         {manages && (
           <>
             {!replying ? (
-              <div className={classes.actions}>
+              <Group gap={8}>
                 <Button
                   size="xs"
                   label={`Reply to ${name}`}
@@ -200,7 +201,7 @@ function ClarificationCard({
                   Reply
                 </Button>
                 {markOrReopen}
-              </div>
+              </Group>
             ) : (
               <form
                 className={classes.form}
@@ -243,7 +244,7 @@ function ClarificationCard({
                     }
                   />
                 )}
-                <div className={classes.actions}>
+                <Group gap={8}>
                   <Button type="submit" size="xs" loading={busy === 'reply'}>
                     {readers === 'everyone' ? 'Post the announcement' : 'Send reply'}
                   </Button>
@@ -257,35 +258,29 @@ function ClarificationCard({
                   >
                     Cancel
                   </Button>
-                </div>
+                </Group>
               </form>
             )}
-            <Modal
+            <ConfirmDialog
               opened={asking}
               onClose={() => setAsking(false)}
               title="Mark it answered without a reply?"
+              confirm="Mark it answered"
+              cancel="Not now"
+              loading={busy === 'mark'}
+              onConfirm={() => void markAnswered()}
             >
-              <div className={classes.stack}>
-                <BodyText>
-                  Nobody has replied to &ldquo;{name}&rdquo;. The entrant sees it
-                  answered with no answer from you, and it leaves the open questions.
-                </BodyText>
-                <BodyText tone="secondary">
-                  You can reopen it later. To answer it, write a reply instead.
-                </BodyText>
-                {change.error !== null && (
-                  <ErrorBlock error={change.error} compact heading="Couldn’t close" />
-                )}
-                <div className={classes.actions}>
-                  <Button loading={busy === 'mark'} onClick={() => void markAnswered()}>
-                    Mark it answered
-                  </Button>
-                  <Button variant="secondary" onClick={() => setAsking(false)}>
-                    Not now
-                  </Button>
-                </div>
-              </div>
-            </Modal>
+              <BodyText>
+                Nobody has replied to &ldquo;{name}&rdquo;. The entrant sees it answered
+                with no answer from you, and it leaves the open questions.
+              </BodyText>
+              <BodyText tone="secondary">
+                You can reopen it later. To answer it, write a reply instead.
+              </BodyText>
+              {change.error !== null && (
+                <ErrorBlock error={change.error} compact heading="Couldn’t close" />
+              )}
+            </ConfirmDialog>
           </>
         )}
         {change.error !== null && !asking && (
@@ -324,24 +319,23 @@ export function InboxPage() {
       }
     >
       <Card>
-        {view.state === 'loading' && <PageSkeleton rows={3} />}
-        {view.state === 'error' && (
-          <ErrorBlock error={view.error} onRetry={view.retry} />
-        )}
-        {view.state === 'ready' &&
-          (view.data.length === 0 ? (
-            <BodyText>No questions are waiting for an answer.</BodyText>
-          ) : (
-            <ol className={classes.questions} aria-label="Open questions">
-              {view.data.map((clarification) => (
-                <ClarificationCard
-                  key={`${clarification.contest.contest ?? ''}/${clarification.asker}/${String(clarification.number)}`}
-                  clarification={clarification}
-                  showContest
-                />
-              ))}
-            </ol>
-          ))}
+        <Loaded view={view} rows={3}>
+          {(waiting) =>
+            waiting.length === 0 ? (
+              <BodyText>No questions are waiting for an answer.</BodyText>
+            ) : (
+              <ol className={classes.questions} aria-label="Open questions">
+                {waiting.map((clarification) => (
+                  <ClarificationCard
+                    key={`${clarification.contest.contest ?? ''}/${clarification.asker}/${String(clarification.number)}`}
+                    clarification={clarification}
+                    showContest
+                  />
+                ))}
+              </ol>
+            )
+          }
+        </Loaded>
       </Card>
     </SectionPage>
   );
@@ -377,47 +371,52 @@ export function ContestClarifications({
     />
   );
 
-  if (view.state === 'loading') return <PageSkeleton rows={2} />;
-  if (view.state === 'error')
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
-  if (view.data.length === 0) {
-    return <BodyText tone="secondary">Nobody has asked anything yet.</BodyText>;
-  }
-  const open = view.data
-    .filter((found) => !found.answered)
-    .sort((a, b) => Date.parse(a.asked_at) - Date.parse(b.asked_at));
-  const answered = view.data
-    .filter((found) => found.answered)
-    .sort((a, b) => Date.parse(b.asked_at) - Date.parse(a.asked_at));
-  const count = (n: number) =>
-    `${String(n)} answered ${n === 1 ? 'question' : 'questions'}`;
-
   return (
-    <div className={classes.stack}>
-      <SectionTitle>Open</SectionTitle>
-      {open.length === 0 ? (
-        <BodyText tone="secondary">Every question is answered.</BodyText>
-      ) : (
-        <ol className={classes.questions} aria-label="Open questions">
-          {open.map(card)}
-        </ol>
-      )}
-      {answered.length > 0 && (
-        <>
-          <div className={classes.actions}>
-            <Button variant="secondary" onClick={() => setShowAnswered(!showAnswered)}>
-              {showAnswered
-                ? 'Hide the answered questions'
-                : `Show ${count(answered.length)}`}
-            </Button>
-          </div>
-          {showAnswered && (
-            <ol className={classes.questions} aria-label="Answered questions">
-              {answered.map(card)}
-            </ol>
-          )}
-        </>
-      )}
-    </div>
+    <Loaded view={view} rows={2}>
+      {(asked) => {
+        if (asked.length === 0) {
+          return <BodyText tone="secondary">Nobody has asked anything yet.</BodyText>;
+        }
+        const open = asked
+          .filter((found) => !found.answered)
+          .sort((a, b) => Date.parse(a.asked_at) - Date.parse(b.asked_at));
+        const answered = asked
+          .filter((found) => found.answered)
+          .sort((a, b) => Date.parse(b.asked_at) - Date.parse(a.asked_at));
+        const count = (n: number) =>
+          `${String(n)} answered ${n === 1 ? 'question' : 'questions'}`;
+        return (
+          <Stack gap="sm">
+            <SectionTitle>Open</SectionTitle>
+            {open.length === 0 ? (
+              <BodyText tone="secondary">Every question is answered.</BodyText>
+            ) : (
+              <ol className={classes.questions} aria-label="Open questions">
+                {open.map(card)}
+              </ol>
+            )}
+            {answered.length > 0 && (
+              <>
+                <Group gap={8}>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowAnswered(!showAnswered)}
+                  >
+                    {showAnswered
+                      ? 'Hide the answered questions'
+                      : `Show ${count(answered.length)}`}
+                  </Button>
+                </Group>
+                {showAnswered && (
+                  <ol className={classes.questions} aria-label="Answered questions">
+                    {answered.map(card)}
+                  </ol>
+                )}
+              </>
+            )}
+          </Stack>
+        );
+      }}
+    </Loaded>
   );
 }

@@ -28,9 +28,7 @@ import {
  * are and each one's type, so a value is written as its type. Who gives each
  * is the task's: the entrant, by `entrant` and its form details; one value
  * per run, by an axis of `repeat`; or the task, by a value. When the
- * declarations cannot be read, the form edits the `inputs` entries the file
- * has, and adds or removes one by its id. The save checks both against the
- * workflow.
+ * declarations cannot be read, the cards show no input to edit.
  */
 export type TaskValues = {
   name: string;

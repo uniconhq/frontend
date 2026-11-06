@@ -1,3 +1,4 @@
+import { Group } from '@mantine/core';
 import type { ReactNode } from 'react';
 import { PageTitle } from './PageTitle';
 import classes from './Page.module.css';
@@ -32,7 +33,7 @@ export function PageHeader({
     <header className={classes.header}>
       <div className={classes.heading}>
         <PageTitle>{title}</PageTitle>
-        {meta !== undefined && <div className={classes.meta}>{meta}</div>}
+        {meta !== undefined && <Group gap="8px 16px">{meta}</Group>}
         {children}
       </div>
       {links !== undefined && <div className={classes.links}>{links}</div>}

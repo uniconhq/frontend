@@ -1,4 +1,6 @@
 import { http, HttpResponse } from 'msw';
+import type { components } from '@/api/schema';
+import type { BoxOutput, WorkflowBox, WorkflowItem } from '@/api/types';
 import type { PrimitiveInfo, PortDecl } from '@/features/organise/workflows/primitives';
 import { problem } from './server';
 
@@ -450,6 +452,49 @@ export const PRIMITIVES: PrimitiveInfo[] = [
 
 export const WORKFLOW_API = '/api/v1/workflows/kenny/tuned';
 
+/** A workflow as the lists give it: kenny/tuned at v1, private, kenny's to edit. */
+export function workflowItem(overrides: Partial<WorkflowItem> = {}): WorkflowItem {
+  return {
+    owner: 'kenny',
+    name: 'tuned',
+    description: '',
+    visibility: 'private',
+    versions: ['v1'],
+    editable: true,
+    yanked: {},
+    ...overrides,
+  };
+}
+
+/** A run workflow's box as `GET .../versions/<version>/box` answers: no ports, nothing newer. */
+export function workflowBox(overrides: Partial<WorkflowBox> = {}): WorkflowBox {
+  return {
+    inputs: [],
+    outputs: [],
+    newer_version: null,
+    description: null,
+    run: true,
+    ...overrides,
+  };
+}
+
+/** A box's port that takes or gives a file, nothing more said of it. */
+export function filePort(name: string): components['schemas']['BoxInput'] & BoxOutput {
+  return {
+    name,
+    type: 'file',
+    title: null,
+    unit: null,
+    at_least: null,
+    at_most: null,
+    better: null,
+    optional: false,
+    options: null,
+    accepts: ['file'],
+    once: null,
+  };
+}
+
 /**
  * The backend of a workflow page for kenny/tuned, which kenny may edit: its
  * draft held here, written by each save, the version check answering with
@@ -497,31 +542,19 @@ export function workflowBackend(
     http.get(WORKFLOW_API, () => HttpResponse.json(page())),
     http.get('/api/v1/workflows', () =>
       HttpResponse.json([
-        {
-          owner: 'kenny',
-          name: 'tuned',
-          visibility: shown(),
-          versions: state.versions,
-          editable: true,
-        },
-        {
+        workflowItem({ visibility: shown(), versions: state.versions }),
+        workflowItem({
           owner: 'unicon',
           name: 'classic',
           visibility: 'public',
           versions: ['v6'],
           editable: false,
-        },
+        }),
       ]),
     ),
     http.get('/api/v1/primitives', () => HttpResponse.json(PRIMITIVES)),
     http.get('/api/v1/workflows/:owner/:name/versions/:version/box', () =>
-      HttpResponse.json({
-        inputs: [],
-        outputs: [],
-        newer_version: null,
-        description: null,
-        run: false,
-      }),
+      HttpResponse.json(workflowBox({ run: false })),
     ),
     http.post('/api/v1/workflows/check', async ({ request }) => {
       const { content } = (await request.json()) as { content: string };

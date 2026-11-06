@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { RadioGroup } from '@/ui/RadioGroup';
+import { Group } from '@/ui/layout';
+import { useFocusOnShow } from '@/lib/use-focus-on-show';
 import {
   bothChanged,
   changedByThem,
@@ -80,10 +82,7 @@ export function MergeView({
   onSave: (content: string) => void;
   onDrop: () => void;
 }) {
-  const panel = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    panel.current?.focus();
-  }, []);
+  const panel = useFocusOnShow<HTMLDivElement>();
 
   const base = parseYaml(baseText);
   const mine = parseYaml(mineText);
@@ -143,7 +142,7 @@ export function MergeView({
           </ul>
         </>
       )}
-      <div className={shared.actions}>
+      <Group gap="xs">
         {choosable && (
           <Button
             loading={busy}
@@ -160,43 +159,33 @@ export function MergeView({
         <Button variant="secondary" disabled={busy} onClick={onDrop}>
           Discard my changes
         </Button>
-      </div>
-      <Modal
+      </Group>
+      <ConfirmDialog
         opened={overwriting}
         onClose={() => setOverwriting(false)}
         title="Save yours over theirs?"
+        confirm="Save yours over theirs"
+        variant="danger"
+        loading={busy}
+        onConfirm={() => {
+          setOverwriting(false);
+          if (diffs !== null) {
+            onSave(
+              mergeText(
+                currentText,
+                diffs,
+                diffs.map(() => 'mine'),
+              ),
+            );
+          }
+        }}
       >
-        <div className={shared.stack}>
-          <BodyText>
-            This throws away what the other person changed in{' '}
-            {theirs.map((diff) => labelOf(diff).replace(/ \(.*\)$/, '')).join(', ')}.
-            Picking a side for each field above keeps the rest of their work.
-          </BodyText>
-          <div className={shared.actions}>
-            <Button
-              variant="danger"
-              loading={busy}
-              onClick={() => {
-                setOverwriting(false);
-                if (diffs !== null) {
-                  onSave(
-                    mergeText(
-                      currentText,
-                      diffs,
-                      diffs.map(() => 'mine'),
-                    ),
-                  );
-                }
-              }}
-            >
-              Save yours over theirs
-            </Button>
-            <Button variant="secondary" onClick={() => setOverwriting(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        <BodyText>
+          This throws away what the other person changed in{' '}
+          {theirs.map((diff) => labelOf(diff).replace(/ \(.*\)$/, '')).join(', ')}.
+          Picking a side for each field above keeps the rest of their work.
+        </BodyText>
+      </ConfirmDialog>
     </div>
   );
 }

@@ -1,9 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import { toApiError } from '@/api/problem';
+import { queryView } from '@/api/query';
 import type { DefinitionError } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { PageLink } from '@/ui/PageLink';
 import { taskSectionPath } from '@/lib/sections';
 import { STORED, viewFilePath } from '../contest/places';
@@ -80,83 +79,81 @@ export function ValuesForm({
     }
   };
 
-  if (query.isPending) return <PageSkeleton rows={6} />;
-  if (query.data === undefined) {
-    return (
-      <ErrorBlock
-        error={toApiError(query.error)}
-        onRetry={() => void query.refetch()}
-      />
-    );
-  }
-  const settings = query.data;
-  const values = settings.values;
-
   return (
-    <div>
-      {values === null ? (
-        <div role="alert">
-          <BodyText>
-            These settings cannot be read, so they cannot be changed here.
-          </BodyText>
-          {settings.unreadable !== null && (
-            <BodyText tone="secondary">{settings.unreadable}</BodyText>
-          )}
-          <BodyText tone="secondary">
-            Fix them as text in{' '}
-            <PageLink to={mendAt(place)}>the stored settings</PageLink>.
-          </BodyText>
-        </div>
-      ) : (
-        <div key={settings.token ?? ''}>
-          {children({
-            values,
-            busy,
-            saved: outcome !== null && outcome.kind !== 'refused',
-            asking:
-              outcome?.kind === 'refused' &&
-              outcome.error.code === 'confirmation_required',
-            refused:
-              outcome?.kind === 'refused' && outcome.error.code === 'invalid_definition'
-                ? definitionErrorsOf(outcome.error)
-                : [],
-            onSave: (change) => {
-              const fresh = copyOf(values);
-              change(fresh);
-              void send({
-                values: fresh,
-                token: settings.token,
-                confirm: false,
-                keep_as_draft: false,
-              });
-            },
-          })}
-        </div>
-      )}
-      {outcome !== null && (
-        <SaveOutcome
-          outcome={outcome}
-          placeOf={
-            placeOf === undefined
-              ? undefined
-              : outcome.kind !== 'refused'
-                ? (where, message) => placeOf(where, message)
-                : (where, message) => placeOf(where, message, outcome.body.values)
-          }
-          bare={bare}
-          onConfirm={(body, asked) => void send({ ...body, confirm: true, asked })}
-          onKeepAsDraft={
-            place.kind === 'task'
-              ? (body) => void send({ ...body, keep_as_draft: true })
-              : undefined
-          }
-          onCancel={() => setOutcome(null)}
-          onReload={() => {
-            setOutcome(null);
-            void query.refetch();
-          }}
-        />
-      )}
-    </div>
+    <Loaded view={queryView(query)} rows={6}>
+      {(settings) => {
+        const values = settings.values;
+        return (
+          <div>
+            {values === null ? (
+              <div role="alert">
+                <BodyText>
+                  These settings cannot be read, so they cannot be changed here.
+                </BodyText>
+                {settings.unreadable !== null && (
+                  <BodyText tone="secondary">{settings.unreadable}</BodyText>
+                )}
+                <BodyText tone="secondary">
+                  Fix them as text in{' '}
+                  <PageLink to={mendAt(place)}>the stored settings</PageLink>.
+                </BodyText>
+              </div>
+            ) : (
+              <div key={settings.token ?? ''}>
+                {children({
+                  values,
+                  busy,
+                  saved: outcome !== null && outcome.kind !== 'refused',
+                  asking:
+                    outcome?.kind === 'refused' &&
+                    outcome.error.code === 'confirmation_required',
+                  refused:
+                    outcome?.kind === 'refused' &&
+                    outcome.error.code === 'invalid_definition'
+                      ? definitionErrorsOf(outcome.error)
+                      : [],
+                  onSave: (change) => {
+                    const fresh = copyOf(values);
+                    change(fresh);
+                    void send({
+                      values: fresh,
+                      token: settings.token,
+                      confirm: false,
+                      keep_as_draft: false,
+                    });
+                  },
+                })}
+              </div>
+            )}
+            {outcome !== null && (
+              <SaveOutcome
+                outcome={outcome}
+                placeOf={
+                  placeOf === undefined
+                    ? undefined
+                    : outcome.kind !== 'refused'
+                      ? (where, message) => placeOf(where, message)
+                      : (where, message) => placeOf(where, message, outcome.body.values)
+                }
+                bare={bare}
+                onConfirm={(body, asked) =>
+                  void send({ ...body, confirm: true, asked })
+                }
+                onKeepAsDraft={
+                  place.kind === 'task'
+                    ? (body) => void send({ ...body, keep_as_draft: true })
+                    : undefined
+                }
+                onCancel={() => setOutcome(null)}
+                onReload={() => {
+                  setOutcome(null);
+                  void query.refetch();
+                }}
+              />
+            )}
+          </div>
+        );
+      }}
+    </Loaded>
   );
 }

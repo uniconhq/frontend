@@ -1,138 +1,110 @@
 import Uppy from '@uppy/core';
 import AwsS3, { type AwsS3UploadParameters } from '@uppy/aws-s3';
+import { byPlace, type At } from '@/api/place';
 import { $api, widenQuery } from '@/api/query';
 import { apiClient } from '@/api/client';
 import { ApiError, isApiError } from '@/api/problem';
 import type { components } from '@/api/schema';
 import { sendPartToStore } from './transfer';
 
-export type MultipartPlace =
-  | { kind: 'task'; org: string; contest: string; task: string }
-  | { kind: 'workflow'; owner: string; name: string };
+export type MultipartPlace = At<'task' | 'workflow'>;
 export type PartTransfer = components['schemas']['Transfer'];
 
 const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/part-uploads';
 const WORKFLOW = '/api/v1/workflows/{owner}/{name}/part-uploads';
 
 function client(place: MultipartPlace) {
-  if (place.kind === 'workflow') {
-    const path = { owner: place.owner, name: place.name };
-    return {
-      opened: async () =>
-        required(
-          (await apiClient.GET(WORKFLOW, { params: { path }, signal: deadline() }))
-            .data,
-        ),
-      start: async (
-        body: components['schemas']['PartUploadRequest'],
-        signal?: AbortSignal,
-      ) =>
-        required(
-          (
-            await apiClient.POST(WORKFLOW, {
-              params: { path },
-              body,
-              signal: deadline(signal),
-            })
-          ).data,
-        ),
-      read: async (upload: string, signal?: AbortSignal) =>
-        required(
-          (
-            await apiClient.GET(`${WORKFLOW}/{upload}`, {
-              params: { path: { ...path, upload } },
-              signal: deadline(signal),
-            })
-          ).data,
-        ),
-      sign: async (upload: string, number: number, signal?: AbortSignal) =>
-        required(
-          (
-            await apiClient.POST(`${WORKFLOW}/{upload}/sign`, {
-              params: { path: { ...path, upload } },
-              body: { numbers: [number] },
-              signal: deadline(signal),
-            })
-          ).data,
-        ),
-      finish: async (
-        upload: string,
-        parts: components['schemas']['FinishedPart'][],
-        signal?: AbortSignal,
-      ) =>
-        required(
-          (
-            await apiClient.POST(`${WORKFLOW}/{upload}/finish`, {
-              params: { path: { ...path, upload } },
-              body: { parts },
-              signal: deadline(signal),
-            })
-          ).data,
-        ),
-      abort: async (upload: string, signal?: AbortSignal) => {
-        await apiClient.DELETE(`${WORKFLOW}/{upload}`, {
-          params: { path: { ...path, upload } },
-          signal: deadline(signal),
-        });
-      },
-    };
-  }
-  const path = { org: place.org, contest: place.contest, task: place.task };
   return {
-    opened: async () =>
-      required(
-        (await apiClient.GET(TASK, { params: { path }, signal: deadline() })).data,
-      ),
-    start: async (
-      body: components['schemas']['PartUploadRequest'],
-      signal?: AbortSignal,
-    ) =>
-      required(
-        (
-          await apiClient.POST(TASK, {
-            params: { path },
-            body,
-            signal: deadline(signal),
-          })
-        ).data,
-      ),
-    read: async (upload: string, signal?: AbortSignal) =>
-      required(
-        (
-          await apiClient.GET(`${TASK}/{upload}`, {
-            params: { path: { ...path, upload } },
-            signal: deadline(signal),
-          })
-        ).data,
-      ),
-    sign: async (upload: string, number: number, signal?: AbortSignal) =>
-      required(
-        (
-          await apiClient.POST(`${TASK}/{upload}/sign`, {
-            params: { path: { ...path, upload } },
-            body: { numbers: [number] },
-            signal: deadline(signal),
-          })
-        ).data,
-      ),
-    finish: async (
+    opened: () => {
+      const init = { signal: deadline() };
+      return byPlace(place, {
+        task: (path) => answer(apiClient.GET(TASK, { params: { path }, ...init })),
+        workflow: (path) =>
+          answer(apiClient.GET(WORKFLOW, { params: { path }, ...init })),
+      });
+    },
+    start: (body: components['schemas']['PartUploadRequest'], signal?: AbortSignal) => {
+      const init = { body, signal: deadline(signal) };
+      return byPlace(place, {
+        task: (path) => answer(apiClient.POST(TASK, { params: { path }, ...init })),
+        workflow: (path) =>
+          answer(apiClient.POST(WORKFLOW, { params: { path }, ...init })),
+      });
+    },
+    read: (upload: string, signal?: AbortSignal) => {
+      const init = { signal: deadline(signal) };
+      return byPlace(place, {
+        task: (path) =>
+          answer(
+            apiClient.GET(`${TASK}/{upload}`, {
+              params: { path: { ...path, upload } },
+              ...init,
+            }),
+          ),
+        workflow: (path) =>
+          answer(
+            apiClient.GET(`${WORKFLOW}/{upload}`, {
+              params: { path: { ...path, upload } },
+              ...init,
+            }),
+          ),
+      });
+    },
+    sign: (upload: string, number: number, signal?: AbortSignal) => {
+      const init = { body: { numbers: [number] }, signal: deadline(signal) };
+      return byPlace(place, {
+        task: (path) =>
+          answer(
+            apiClient.POST(`${TASK}/{upload}/sign`, {
+              params: { path: { ...path, upload } },
+              ...init,
+            }),
+          ),
+        workflow: (path) =>
+          answer(
+            apiClient.POST(`${WORKFLOW}/{upload}/sign`, {
+              params: { path: { ...path, upload } },
+              ...init,
+            }),
+          ),
+      });
+    },
+    finish: (
       upload: string,
       parts: components['schemas']['FinishedPart'][],
       signal?: AbortSignal,
-    ) =>
-      required(
-        (
-          await apiClient.POST(`${TASK}/{upload}/finish`, {
-            params: { path: { ...path, upload } },
-            body: { parts },
-            signal: deadline(signal),
-          })
-        ).data,
-      ),
+    ) => {
+      const init = { body: { parts }, signal: deadline(signal) };
+      return byPlace(place, {
+        task: (path) =>
+          answer(
+            apiClient.POST(`${TASK}/{upload}/finish`, {
+              params: { path: { ...path, upload } },
+              ...init,
+            }),
+          ),
+        workflow: (path) =>
+          answer(
+            apiClient.POST(`${WORKFLOW}/{upload}/finish`, {
+              params: { path: { ...path, upload } },
+              ...init,
+            }),
+          ),
+      });
+    },
     abort: async (upload: string, signal?: AbortSignal) => {
-      await apiClient.DELETE(`${TASK}/{upload}`, {
-        params: { path: { ...path, upload } },
-        signal: deadline(signal),
+      const init = { signal: deadline(signal) };
+      await byPlace(place, {
+        task: (path) =>
+          apiClient.DELETE(`${TASK}/{upload}`, {
+            params: { path: { ...path, upload } },
+            ...init,
+          }),
+        workflow: (path) =>
+          apiClient.DELETE(`${WORKFLOW}/{upload}`, {
+            params: { path: { ...path, upload } },
+            ...init,
+          }),
       });
     },
   };
@@ -143,25 +115,18 @@ function deadline(signal?: AbortSignal): AbortSignal {
   return signal === undefined ? limit : AbortSignal.any([signal, limit]);
 }
 
-function required<T>(data: T | undefined): T {
+async function answer<T>(sent: Promise<{ data?: T }>): Promise<T> {
+  const { data } = await sent;
   if (data === undefined) throw new Error('The upload got no answer. Try again.');
   return data;
 }
 
 export function partUploadsQuery(place: MultipartPlace) {
-  return place.kind === 'task'
-    ? widenQuery(
-        $api.queryOptions('get', TASK, {
-          params: {
-            path: { org: place.org, contest: place.contest, task: place.task },
-          },
-        }),
-      )
-    : widenQuery(
-        $api.queryOptions('get', WORKFLOW, {
-          params: { path: { owner: place.owner, name: place.name } },
-        }),
-      );
+  return byPlace(place, {
+    task: (path) => widenQuery($api.queryOptions('get', TASK, { params: { path } })),
+    workflow: (path) =>
+      widenQuery($api.queryOptions('get', WORKFLOW, { params: { path } })),
+  });
 }
 
 export function readPartUpload(

@@ -5,11 +5,12 @@ import { $api, queryView } from '@/api/query';
 import type { TaskStanding } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { PageLink } from '@/ui/PageLink';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { Loaded } from '@/ui/feedback/Loaded';
+import { Group } from '@/ui/layout';
 import { standingOf } from '@/lib/contest-state';
 import { contestPath, taskPath } from '@/lib/organiser-paths';
 import { contestSectionPath, taskCardPath } from '@/lib/sections';
@@ -295,7 +296,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
           return (
             <>
               <ReadOnlyAt place={{ kind: 'contest', org, contest }} allowed={admin} />
-              <div className={classes.statusHead}>
+              <Group gap="8px 12px">
                 <BodyText>
                   Who sees it:{' '}
                   {VISIBILITY_CHOICES.find((one) => one.value === values.visibility)
@@ -316,7 +317,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                     </Button>
                   </FieldBox>
                 )}
-              </div>
+              </Group>
               {standing === 'draft' && (
                 <Loaded view={tasks} compact>
                   {() => (
@@ -331,7 +332,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                   )}
                 </Loaded>
               )}
-              {actions.length > 0 && <div className={shared.actions}>{actions}</div>}
+              {actions.length > 0 && <Group gap="xs">{actions}</Group>}
               {refused?.kind === 'refused' &&
               refused.error.code === 'confirmation_required' ? (
                 <SaveOutcome
@@ -363,118 +364,78 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                   </div>
                 )
               )}
-              <Modal
+              <ConfirmDialog
                 opened={asking === 'open'}
                 onClose={() => setAsking(null)}
                 title="Open the contest?"
+                confirm="Open the contest"
+                loading={pending}
+                onConfirm={() =>
+                  void run((fresh) => writeAt(fresh, ['state'], 'published'))
+                }
               >
-                <div className={shared.stack}>
-                  {openingSentences(values, now).map((sentence) => (
-                    <BodyText key={sentence}>{sentence}</BodyText>
-                  ))}
-                  <div className={shared.actions}>
-                    <Button
-                      loading={pending}
-                      onClick={() =>
-                        void run((fresh) => writeAt(fresh, ['state'], 'published'))
-                      }
-                    >
-                      Open the contest
-                    </Button>
-                    <Button variant="secondary" onClick={() => setAsking(null)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </Modal>
-              <Modal
+                {openingSentences(values, now).map((sentence) => (
+                  <BodyText key={sentence}>{sentence}</BodyText>
+                ))}
+              </ConfirmDialog>
+              <ConfirmDialog
                 opened={asking === 'draft'}
                 onClose={() => setAsking(null)}
                 title="Put the contest back to draft?"
+                confirm="Back to draft"
+                variant="danger"
+                loading={pending}
+                onConfirm={() =>
+                  void run((fresh) => writeAt(fresh, ['state'], 'draft'))
+                }
               >
-                <div className={shared.stack}>
-                  <BodyText>
-                    Only its organisers see it until it is opened again: entrants can no
-                    longer reach it, and nobody new can register. Those already
-                    registered stay registered.
-                  </BodyText>
-                  <BodyText tone="secondary">
-                    Once the contest starts, it can no longer go back to draft.
-                  </BodyText>
-                  <div className={shared.actions}>
-                    <Button
-                      variant="danger"
-                      loading={pending}
-                      onClick={() =>
-                        void run((fresh) => writeAt(fresh, ['state'], 'draft'))
-                      }
-                    >
-                      Back to draft
-                    </Button>
-                    <Button variant="secondary" onClick={() => setAsking(null)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </Modal>
-              <Modal
+                <BodyText>
+                  Only its organisers see it until it is opened again: entrants can no
+                  longer reach it, and nobody new can register. Those already registered
+                  stay registered.
+                </BodyText>
+                <BodyText tone="secondary">
+                  Once the contest starts, it can no longer go back to draft.
+                </BodyText>
+              </ConfirmDialog>
+              <ConfirmDialog
                 opened={asking === 'archive'}
                 onClose={() => setAsking(null)}
                 title="Archive the contest?"
+                confirm="Archive"
+                variant="danger"
+                loading={pending}
+                onConfirm={() =>
+                  void run((fresh) => writeAt(fresh, ['state'], 'archived'))
+                }
               >
-                <div className={shared.stack}>
-                  <BodyText>
-                    Nobody can submit to its tasks any more, though they can still be
-                    read. Its entrants and their results stay as they are.
-                  </BodyText>
-                  <div className={shared.actions}>
-                    <Button
-                      variant="danger"
-                      loading={pending}
-                      onClick={() =>
-                        void run((fresh) => writeAt(fresh, ['state'], 'archived'))
-                      }
-                    >
-                      Archive
-                    </Button>
-                    <Button variant="secondary" onClick={() => setAsking(null)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </Modal>
-              <Modal
+                <BodyText>
+                  Nobody can submit to its tasks any more, though they can still be
+                  read. Its entrants and their results stay as they are.
+                </BodyText>
+              </ConfirmDialog>
+              <ConfirmDialog
                 opened={asking === 'visibility'}
                 onClose={() => setAsking(null)}
                 title="Who sees it"
+                confirm="Save"
+                loading={pending}
+                disabled={visibility === values.visibility || visibility === ''}
+                onConfirm={() =>
+                  void run((fresh) => writeAt(fresh, ['visibility'], visibility))
+                }
               >
-                <div className={shared.stack}>
-                  <RadioGroup
-                    label="Who sees the contest"
-                    value={visibility}
-                    options={VISIBILITY_CHOICES}
-                    onChange={setVisibility}
-                  />
-                  <BodyText tone="secondary">
-                    Who may enter is set separately, under How people enter: a contest
-                    can be seen by anyone and still entered only by invite.
-                  </BodyText>
-                  <div className={shared.actions}>
-                    <Button
-                      loading={pending}
-                      disabled={visibility === values.visibility || visibility === ''}
-                      onClick={() =>
-                        void run((fresh) => writeAt(fresh, ['visibility'], visibility))
-                      }
-                    >
-                      Save
-                    </Button>
-                    <Button variant="secondary" onClick={() => setAsking(null)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </Modal>
+                <RadioGroup
+                  label="Who sees the contest"
+                  value={visibility}
+                  options={VISIBILITY_CHOICES}
+                  onChange={setVisibility}
+                />
+                <BodyText tone="secondary">
+                  Who may enter is set separately, under How people enter: a contest can
+                  be seen by anyone and still entered only by invite.
+                </BodyText>
+              </ConfirmDialog>
             </>
           );
         }}

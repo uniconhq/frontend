@@ -1,71 +1,63 @@
-import { partTransfer, partTransport } from '@/test/part-uploads';
+import { partTransfer } from '@/test/part-uploads';
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import userEvent from '@/test/user-event';
-import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
-import { CLASSIC, WORKFLOW_API, workflowBackend } from '@/test/workflows';
-import { EDITOR_PAGE, barButton, findDialog, openFiles } from '@/test/workflow-editor';
+import { problem } from '@/test/server';
+import { CLASSIC, WORKFLOW_API } from '@/test/workflows';
+import { barButton, findDialog, openEditor, openFiles } from '@/test/workflow-editor';
+import { fileContent, treeEntry } from '@/test/organiser';
 
 describe('the workflow files', () => {
   it('uploads a file, saves it with the draft and publishes that repository revision', async () => {
-    const backend = workflowBackend(CLASSIC);
     const sent: unknown[] = [];
     let published: unknown;
     let savedFile = false;
     const checked: string[][] = [];
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      signedIn,
-      ...backend.handlers,
-    );
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      http.post('/api/v1/workflows/check', async ({ request }) => {
-        const { paths } = (await request.json()) as { paths?: string[] };
-        checked.push(paths ?? []);
-        return HttpResponse.json({
-          problems: paths?.includes('scorer/main.py')
-            ? []
-            : [
-                {
-                  path: ['steps', 0, 'with', 'source'],
-                  message: 'There is no file scorer/main.py in this workflow.',
-                },
-              ],
-        });
-      }),
-      http.get(`${WORKFLOW_API}/tree`, () =>
-        HttpResponse.json(
-          savedFile ? [{ path: 'scorer/main.py', type: 'file', size: 10 }] : [],
+    const { user, backend } = openEditor({
+      handlers: [
+        http.post('/api/v1/workflows/check', async ({ request }) => {
+          const { paths } = (await request.json()) as { paths?: string[] };
+          checked.push(paths ?? []);
+          return HttpResponse.json({
+            problems: paths?.includes('scorer/main.py')
+              ? []
+              : [
+                  {
+                    path: ['steps', 0, 'with', 'source'],
+                    message: 'There is no file scorer/main.py in this workflow.',
+                  },
+                ],
+          });
+        }),
+        http.get(`${WORKFLOW_API}/tree`, () =>
+          HttpResponse.json(
+            savedFile ? [{ path: 'scorer/main.py', type: 'file', size: 10 }] : [],
+          ),
         ),
-      ),
-      http.get(`${WORKFLOW_API}/files/*`, () => problem(404, 'not_found')),
-      http.post(`${WORKFLOW_API}/part-uploads`, async ({ request }) => {
-        sent.push(await request.json());
-        return HttpResponse.json(partTransfer('upload-1'));
-      }),
-      http.put('/-/uploads/upload-1', () => new HttpResponse(null)),
-      http.post(`${WORKFLOW_API}/part-uploads/upload-1/finish`, () =>
-        HttpResponse.json(partTransfer('finished', 'stored')),
-      ),
-      http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
-        sent.push(await request.json());
-        savedFile = true;
-        return HttpResponse.json({
-          content: CLASSIC,
-          token: 'saved',
-          revision: 'files-commit',
-        });
-      }),
-      http.post(`${WORKFLOW_API}/versions`, async ({ request }) => {
-        published = await request.json();
-        return HttpResponse.json({ version: 'v1' });
-      }),
-    );
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+        http.get(`${WORKFLOW_API}/files/*`, () => problem(404, 'not_found')),
+        http.post(`${WORKFLOW_API}/part-uploads`, async ({ request }) => {
+          sent.push(await request.json());
+          return HttpResponse.json(partTransfer('upload-1'));
+        }),
+        http.put('/-/uploads/upload-1', () => new HttpResponse(null)),
+        http.post(`${WORKFLOW_API}/part-uploads/upload-1/finish`, () =>
+          HttpResponse.json(partTransfer('finished', 'stored')),
+        ),
+        http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
+          sent.push(await request.json());
+          savedFile = true;
+          return HttpResponse.json({
+            content: CLASSIC,
+            token: 'saved',
+            revision: 'files-commit',
+          });
+        }),
+        http.post(`${WORKFLOW_API}/versions`, async ({ request }) => {
+          published = await request.json();
+          return HttpResponse.json({ version: 'v1' });
+        }),
+      ],
+    });
     await screen.findAllByText('There is no file scorer/main.py in this workflow.');
     const files = await openFiles(user);
     // The folder is beside the drop, and the drop uploads at once.
@@ -132,29 +124,17 @@ describe('the workflow files', () => {
     );
   });
   it('lists the saved files but workflow.yaml, which View YAML shows', async () => {
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      signedIn,
-      ...workflowBackend(CLASSIC).handlers,
-    );
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      http.get(`${WORKFLOW_API}/tree`, () =>
-        HttpResponse.json(
-          ['workflow.yaml', 'score.py'].map((path) => ({
-            path,
-            kind: 'file',
-            token: `${path}-token`,
-            size: 3,
-            upload: null,
-            version: 'old',
-            start: null,
-          })),
+    const { user } = openEditor({
+      handlers: [
+        http.get(`${WORKFLOW_API}/tree`, () =>
+          HttpResponse.json(
+            ['workflow.yaml', 'score.py'].map((path) =>
+              treeEntry({ path, token: `${path}-token`, size: 3, version: 'old' }),
+            ),
+          ),
         ),
-      ),
-    );
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+      ],
+    });
     const files = await openFiles(user);
     expect(
       await within(files).findByRole('button', { name: /^score\.py/ }),
@@ -163,40 +143,25 @@ describe('the workflow files', () => {
   });
 
   it('removes a saved file with its token, and lets the removal be undone', async () => {
-    const backend = workflowBackend(CLASSIC);
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      signedIn,
-      ...backend.handlers,
-    );
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      http.get(`${WORKFLOW_API}/tree`, () =>
-        HttpResponse.json([
-          {
-            path: 'score.py',
-            kind: 'file',
-            token: 'old-file',
-            size: 3,
-            upload: null,
-            version: 'old',
-            start: null,
-          },
-        ]),
-      ),
-      http.get(`${WORKFLOW_API}/files/score.py`, () =>
-        HttpResponse.json({
-          path: 'score.py',
-          content: 'old',
-          encoding: 'utf-8',
-          token: 'old-file',
-          upload: null,
-          version: 'old',
-        }),
-      ),
-    );
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor({
+      handlers: [
+        http.get(`${WORKFLOW_API}/tree`, () =>
+          HttpResponse.json([
+            treeEntry({ path: 'score.py', token: 'old-file', size: 3, version: 'old' }),
+          ]),
+        ),
+        http.get(`${WORKFLOW_API}/files/score.py`, () =>
+          HttpResponse.json(
+            fileContent({
+              path: 'score.py',
+              content: 'old',
+              token: 'old-file',
+              version: 'old',
+            }),
+          ),
+        ),
+      ],
+    });
     const files = await openFiles(user);
     await user.click(await within(files).findByRole('button', { name: /^score.py/ }));
     await user.click(within(files).getByRole('button', { name: 'Remove score.py' }));
@@ -216,61 +181,51 @@ describe('the workflow files', () => {
   });
 
   it('downloads a saved file of the draft through the door, an upload as well as text', async () => {
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      signedIn,
-      ...workflowBackend(CLASSIC).handlers,
-    );
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      http.get(`${WORKFLOW_API}/tree`, () =>
-        HttpResponse.json([
-          {
-            path: 'score.py',
-            kind: 'file',
-            token: 'score-token',
-            size: 9,
-            href: '/-/downloads/workflows/kenny/tuned/draft/score.py',
-            upload: null,
-            version: 'old',
-            start: null,
-          },
-          {
-            path: 'big input.bin',
-            kind: 'file',
-            token: 'big-token',
-            size: 130,
-            href: '/-/downloads/workflows/kenny/tuned/draft/big%20input.bin',
-            upload: { size: 5_000_000, digest: 'a'.repeat(64) },
-            version: 'old',
-            start: null,
-          },
-        ]),
-      ),
-      http.get(`${WORKFLOW_API}/files/*`, ({ request }) =>
-        new URL(request.url).pathname.endsWith('score.py')
-          ? HttpResponse.json({
+    const { user } = openEditor({
+      handlers: [
+        http.get(`${WORKFLOW_API}/tree`, () =>
+          HttpResponse.json([
+            treeEntry({
               path: 'score.py',
-              content: 'print(1)\n',
-              encoding: 'utf-8',
               token: 'score-token',
-              upload: null,
+              size: 9,
               href: '/-/downloads/workflows/kenny/tuned/draft/score.py',
               version: 'old',
-            })
-          : HttpResponse.json({
+            }),
+            treeEntry({
               path: 'big input.bin',
-              content: 'pointer',
-              encoding: 'utf-8',
               token: 'big-token',
+              size: 130,
               href: '/-/downloads/workflows/kenny/tuned/draft/big%20input.bin',
               upload: { size: 5_000_000, digest: 'a'.repeat(64) },
               version: 'old',
             }),
-      ),
-    );
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+          ]),
+        ),
+        http.get(`${WORKFLOW_API}/files/*`, ({ request }) =>
+          new URL(request.url).pathname.endsWith('score.py')
+            ? HttpResponse.json(
+                fileContent({
+                  path: 'score.py',
+                  content: 'print(1)\n',
+                  token: 'score-token',
+                  href: '/-/downloads/workflows/kenny/tuned/draft/score.py',
+                  version: 'old',
+                }),
+              )
+            : HttpResponse.json(
+                fileContent({
+                  path: 'big input.bin',
+                  content: 'pointer',
+                  token: 'big-token',
+                  href: '/-/downloads/workflows/kenny/tuned/draft/big%20input.bin',
+                  upload: { size: 5_000_000, digest: 'a'.repeat(64) },
+                  version: 'old',
+                }),
+              ),
+        ),
+      ],
+    });
     const files = await openFiles(user);
     await user.click(await within(files).findByRole('button', { name: /^big input/ }));
     expect(
@@ -286,42 +241,31 @@ describe('the workflow files', () => {
   });
 
   it('asks before removing a file a step reads, naming the steps', async () => {
-    const backend = workflowBackend(
-      CLASSIC.replace('${{ inputs.answer }}', '${{ workflow.expected.out }}'),
-    );
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      signedIn,
-      ...backend.handlers,
-    );
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      http.get(`${WORKFLOW_API}/tree`, () =>
-        HttpResponse.json([
-          {
-            path: 'expected.out',
-            kind: 'file',
-            token: 'expected-token',
-            size: 3,
-            upload: null,
-            version: 'old',
-            start: null,
-          },
-        ]),
-      ),
-      http.get(`${WORKFLOW_API}/files/expected.out`, () =>
-        HttpResponse.json({
-          path: 'expected.out',
-          content: '42\n',
-          encoding: 'utf-8',
-          token: 'expected-token',
-          upload: null,
-          version: 'old',
-        }),
-      ),
-    );
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user } = openEditor({
+      draft: CLASSIC.replace('${{ inputs.answer }}', '${{ workflow.expected.out }}'),
+      handlers: [
+        http.get(`${WORKFLOW_API}/tree`, () =>
+          HttpResponse.json([
+            treeEntry({
+              path: 'expected.out',
+              token: 'expected-token',
+              size: 3,
+              version: 'old',
+            }),
+          ]),
+        ),
+        http.get(`${WORKFLOW_API}/files/expected.out`, () =>
+          HttpResponse.json(
+            fileContent({
+              path: 'expected.out',
+              content: '42\n',
+              token: 'expected-token',
+              version: 'old',
+            }),
+          ),
+        ),
+      ],
+    });
     const files = await openFiles(user);
     await user.click(
       await within(files).findByRole('button', { name: /^expected\.out/ }),
@@ -345,53 +289,38 @@ describe('the workflow files', () => {
   });
 
   it('replaces a saved file with its read token and keeps the upload after a conflict', async () => {
-    const backend = workflowBackend(CLASSIC);
     let sent: unknown;
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      signedIn,
-      ...backend.handlers,
-    );
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      http.get(`${WORKFLOW_API}/tree`, () =>
-        HttpResponse.json([
-          {
-            path: 'score.py',
-            kind: 'file',
-            token: 'old-file',
-            size: 3,
-            upload: null,
-            version: 'old',
-            start: null,
-          },
-        ]),
-      ),
-      http.get(`${WORKFLOW_API}/files/score.py`, () =>
-        HttpResponse.json({
-          path: 'score.py',
-          content: 'old',
-          encoding: 'utf-8',
-          token: 'old-file',
-          upload: null,
-          version: 'old',
+    const { user } = openEditor({
+      handlers: [
+        http.get(`${WORKFLOW_API}/tree`, () =>
+          HttpResponse.json([
+            treeEntry({ path: 'score.py', token: 'old-file', size: 3, version: 'old' }),
+          ]),
+        ),
+        http.get(`${WORKFLOW_API}/files/score.py`, () =>
+          HttpResponse.json(
+            fileContent({
+              path: 'score.py',
+              content: 'old',
+              token: 'old-file',
+              version: 'old',
+            }),
+          ),
+        ),
+        http.post(`${WORKFLOW_API}/part-uploads`, () =>
+          HttpResponse.json(partTransfer('replacement')),
+        ),
+        http.post(`${WORKFLOW_API}/part-uploads/replacement/finish`, () =>
+          HttpResponse.json(partTransfer('finished', 'stored')),
+        ),
+        http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
+          sent = await request.json();
+          return problem(409, 'conflict', {
+            detail: 'The workflow has changed. Reload it.',
+          });
         }),
-      ),
-      http.post(`${WORKFLOW_API}/part-uploads`, () =>
-        HttpResponse.json(partTransfer('replacement')),
-      ),
-      http.post(`${WORKFLOW_API}/part-uploads/replacement/finish`, () =>
-        HttpResponse.json(partTransfer('finished', 'stored')),
-      ),
-      http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
-        sent = await request.json();
-        return problem(409, 'conflict', {
-          detail: 'The workflow has changed. Reload it.',
-        });
-      }),
-    );
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+      ],
+    });
     const files = await openFiles(user);
     await user.click(await within(files).findByRole('button', { name: /^score.py/ }));
     await user.upload(
@@ -420,32 +349,25 @@ describe('the workflow files', () => {
     expect(barButton('Save')).toBeEnabled();
   });
   it('keeps a new file token when replacing its pending upload', async () => {
-    const backend = workflowBackend(CLASSIC);
     let reads = 0;
     let completed = 0;
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      signedIn,
-      ...backend.handlers,
-    );
-    server.use(
-      ...partTransport(`${WORKFLOW_API}/part-uploads`),
-      http.get(`${WORKFLOW_API}/files/new.py`, () => {
-        reads += 1;
-        return reads === 1
-          ? problem(404, 'not_found')
-          : HttpResponse.json({ token: 'someone-elses-file' });
-      }),
-      http.post(`${WORKFLOW_API}/part-uploads`, () =>
-        HttpResponse.json(partTransfer('new-upload')),
-      ),
-      http.post(`${WORKFLOW_API}/part-uploads/new-upload/finish`, () => {
-        completed += 1;
-        return HttpResponse.json(partTransfer('finished', 'stored'));
-      }),
-    );
-    const user = userEvent.setup();
-    renderApp(EDITOR_PAGE);
+    const { user, backend } = openEditor({
+      handlers: [
+        http.get(`${WORKFLOW_API}/files/new.py`, () => {
+          reads += 1;
+          return reads === 1
+            ? problem(404, 'not_found')
+            : HttpResponse.json({ token: 'someone-elses-file' });
+        }),
+        http.post(`${WORKFLOW_API}/part-uploads`, () =>
+          HttpResponse.json(partTransfer('new-upload')),
+        ),
+        http.post(`${WORKFLOW_API}/part-uploads/new-upload/finish`, () => {
+          completed += 1;
+          return HttpResponse.json(partTransfer('finished', 'stored'));
+        }),
+      ],
+    });
     const files = await openFiles(user);
     for (const [at, content] of ['first', 'second'].entries()) {
       await user.upload(

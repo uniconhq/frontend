@@ -5,10 +5,12 @@ import { $api } from '@/api/query';
 import type { ContestHome, Entrant, Invitation, MyEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
+import { InviteForm, type Target } from '@/ui/InviteForm';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { Group } from '@/ui/layout';
 import { useMe } from '@/session';
 import {
   inTeams,
@@ -188,11 +190,11 @@ function RegisterForm({
           required
         />
       )}
-      <div className={classes.actions}>
+      <Group gap={6}>
         <Button type="submit" loading={change.pending === 'register'}>
           {team ? 'Register the team' : 'Register'}
         </Button>
-      </div>
+      </Group>
     </form>
   );
 }
@@ -261,7 +263,7 @@ function Invitations({ entry, change }: { entry: MyEntry; change: Change }) {
                   It expires on {formatDateTime(new Date(invitation.expires_at))}.
                 </BodyText>
               </div>
-              <div className={classes.actions}>
+              <Group gap={6}>
                 <Button
                   size="xs"
                   label={`Join ${into}`}
@@ -299,7 +301,7 @@ function Invitations({ entry, change }: { entry: MyEntry; change: Change }) {
                 >
                   Decline
                 </Button>
-              </div>
+              </Group>
             </li>
           );
         })}
@@ -308,16 +310,11 @@ function Invitations({ entry, change }: { entry: MyEntry; change: Change }) {
   );
 }
 
-/** A username, or an email address when what was typed has an `@`. */
-function targetOf(typed: string): { username: string } | { email: string } {
-  return typed.includes('@') ? { email: typed } : { username: typed };
-}
-
 /**
- * The form a member asks someone into the team with, by username or email
- * address. It is off while the team is full, counting the invites waiting.
+ * The form a member asks someone into the team with. It is off while the
+ * team is full, counting the invites waiting.
  */
-function InviteForm({
+function InviteToTeam({
   path,
   full,
   most,
@@ -332,57 +329,40 @@ function InviteForm({
     'post',
     '/api/v1/orgs/{org}/contests/{contest}/entrants/mine/invites',
   );
-  const [typed, setTyped] = useState('');
   const [made, setMade] = useState<string | null>(null);
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const target = typed.trim();
-    if (target === '') return;
+  const send = async (target: Target, typed: string) => {
     setMade(null);
-    const outcome = await change.run('invite', () =>
-      invite.mutateAsync({ params: { path }, body: targetOf(target) }),
+    const { ok } = await change.run('invite', () =>
+      invite.mutateAsync({ params: { path }, body: target }),
     );
-    if (outcome.ok) {
-      setTyped('');
-      setMade(`Invited ${target}. They join once they accept.`);
-    }
+    if (ok) setMade(`Invited ${typed}. They join once they accept.`);
+    return ok;
   };
 
   return (
-    <form
+    <InviteForm
+      name="Invite someone to your team"
       className={classes.form}
-      aria-label="Invite someone to your team"
-      onSubmit={(event) => void submit(event)}
-    >
-      <TextInput
-        label="Username or email address"
-        description={
-          full
-            ? `Your team is full: a team holds at most ${String(most)}, counting the people invited.`
-            : 'A username for someone with an account, an email address for anyone.'
-        }
-        value={typed}
-        onChange={setTyped}
-        disabled={full}
-        required
-      />
-      <div className={classes.actions}>
-        <Button
-          size="xs"
-          type="submit"
-          loading={change.pending === 'invite'}
-          disabled={full || (change.pending !== null && change.pending !== 'invite')}
-        >
-          Invite
-        </Button>
-      </div>
-      {made !== null && (
-        <div role="status">
-          <BodyText tone="secondary">{made}</BodyText>
-        </div>
-      )}
-    </form>
+      description={
+        full
+          ? `Your team is full: a team holds at most ${String(most)}, counting the people invited.`
+          : 'A username for someone with an account, an email address for anyone.'
+      }
+      required
+      disabled={full}
+      size="xs"
+      loading={change.pending === 'invite'}
+      blocked={change.pending !== null && change.pending !== 'invite'}
+      onInvite={send}
+      outcome={
+        made !== null && (
+          <div role="status">
+            <BodyText tone="secondary">{made}</BodyText>
+          </div>
+        )
+      }
+    />
   );
 }
 
@@ -432,7 +412,7 @@ function TeamName({
 
   if (!open || !editing) {
     return (
-      <div className={classes.actions}>
+      <Group gap={6}>
         <span className={classes.name}>{entrant.display_name}</span>
         {open && (
           <Button
@@ -449,7 +429,7 @@ function TeamName({
             Edit
           </Button>
         )}
-      </div>
+      </Group>
     );
   }
   return (
@@ -582,7 +562,7 @@ function TeamPart({
       {open && (
         <>
           <SectionTitle order={3}>Invite someone</SectionTitle>
-          <InviteForm path={path} full={full} most={entry.most} change={change} />
+          <InviteToTeam path={path} full={full} most={entry.most} change={change} />
         </>
       )}
     </>
@@ -622,7 +602,7 @@ function Leave({
 
   return (
     <>
-      <div className={classes.actions}>
+      <Group gap={6}>
         <Button
           size="xs"
           variant="secondary"
@@ -632,30 +612,20 @@ function Leave({
         >
           {team ? 'Leave the team' : 'Withdraw my registration'}
         </Button>
-      </div>
-      <Modal
+      </Group>
+      <ConfirmDialog
         opened={asking}
         onClose={() => setAsking(false)}
         title={team ? `Leave ${entrant.display_name}?` : 'Withdraw your registration?'}
+        confirm={team ? 'Leave' : 'Withdraw'}
+        variant="danger"
+        onConfirm={() => {
+          setAsking(false);
+          void change.run('leave', () => leave.mutateAsync({ params: { path } }));
+        }}
       >
-        <div className={classes.form}>
-          <BodyText>{outcome}</BodyText>
-          <div className={classes.actions}>
-            <Button
-              variant="danger"
-              onClick={() => {
-                setAsking(false);
-                void change.run('leave', () => leave.mutateAsync({ params: { path } }));
-              }}
-            >
-              {team ? 'Leave' : 'Withdraw'}
-            </Button>
-            <Button variant="secondary" onClick={() => setAsking(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        <BodyText>{outcome}</BodyText>
+      </ConfirmDialog>
     </>
   );
 }
@@ -759,11 +729,11 @@ export function YourEntry({
       {change.error !== null && (
         <div className={classes.panel} role="alert">
           <ErrorBlock error={change.error} compact heading="Couldn’t do that" />
-          <div className={classes.actions}>
+          <Group gap={6}>
             <Button size="xs" variant="secondary" onClick={change.dismiss}>
               Dismiss
             </Button>
-          </div>
+          </Group>
         </div>
       )}
     </section>

@@ -3,6 +3,7 @@ import { useTaskParams } from '@/lib/route-params';
 import { usePlaceMay } from '../may';
 import { ReadOnlyAt } from '../ReadOnlyAt';
 import classes from './task.module.css';
+import { Group } from '@/ui/layout';
 
 /**
  * One card that builds the task, on the task's page: a heading band with its
@@ -32,7 +33,7 @@ export function BuildCard({
           <h2 className={classes.cardTitle}>{title}</h2>
           <p className={classes.cardLine}>{line}</p>
         </div>
-        <div className={classes.aside}>
+        <Group gap={8}>
           {' '}
           <ReadOnlyAt
             place={place}
@@ -43,7 +44,7 @@ export function BuildCard({
             }
           />
           {aside}
-        </div>
+        </Group>
       </header>
       <div className={classes.cardBody}>{children}</div>
     </section>

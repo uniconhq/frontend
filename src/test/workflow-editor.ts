@@ -1,6 +1,12 @@
 import { waitFor, within } from '@testing-library/react';
 import type { UserEvent } from '@testing-library/user-event';
+import type { RequestHandler } from 'msw';
 import { DRAFT_FILE } from '@/features/organise/workflows/words';
+import { partTransport } from './part-uploads';
+import { renderApp } from './render';
+import { server, signedIn } from './server';
+import userEvent from './user-event';
+import { CLASSIC, WORKFLOW_API, workflowBackend } from './workflows';
 
 /**
  * Finding things on the workflow editor's page, each inside the part of the
@@ -37,6 +43,30 @@ export function findPart(
 
 /** The editor's page for kenny/tuned, the workflow `workflowBackend` serves. */
 export const EDITOR_PAGE = '/workflows/kenny/tuned';
+
+/**
+ * The editor's page opened by kenny on `draft` (CLASSIC by default), served by
+ * `workflowBackend` with `problems` and `versions`. `handlers` go ahead of the
+ * backend's, so one of them answers in its place.
+ */
+export function openEditor({
+  draft = CLASSIC,
+  handlers = [],
+  ...options
+}: {
+  draft?: string;
+  handlers?: RequestHandler[];
+} & NonNullable<Parameters<typeof workflowBackend>[1]> = {}) {
+  const backend = workflowBackend(draft, options);
+  server.use(
+    ...partTransport(`${WORKFLOW_API}/part-uploads`),
+    ...handlers,
+    signedIn,
+    ...backend.handlers,
+  );
+  const user = userEvent.setup();
+  return { user, backend, ...renderApp(EDITOR_PAGE) };
+}
 
 /** A button on the bar, which holds Save, Publish version, Share and View YAML. */
 export function barButton(name: string): HTMLElement {

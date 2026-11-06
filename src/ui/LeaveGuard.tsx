@@ -1,9 +1,9 @@
+import { Group, Stack } from '@mantine/core';
 import { useEffect } from 'react';
 import { useBlocker } from 'react-router';
 import { BodyText } from './BodyText';
 import { Button } from './Button';
 import { Modal } from './Modal';
-import classes from './LeaveGuard.module.css';
 
 /**
  * Leaving the page with changes not saved asks first: by a link, the
@@ -42,15 +42,15 @@ export function LeaveGuard({
       onClose={() => blocker.reset?.()}
       title="Leave without saving?"
     >
-      <div className={classes.stack}>
+      <Stack gap={6}>
         <BodyText size="md">{what} are not saved. Leaving loses them.</BodyText>
-        <div className={classes.actions}>
+        <Group gap={8} align="stretch">
           <Button onClick={() => blocker.reset?.()}>Stay</Button>
           <Button variant="danger" onClick={() => blocker.proceed?.()}>
             Leave without saving
           </Button>
-        </div>
-      </div>
+        </Group>
+      </Stack>
     </Modal>
   );
 }

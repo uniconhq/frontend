@@ -3,7 +3,7 @@ import { useLiveConnected } from '@/live';
 import { GradingsList } from '../gradings/GradingsList';
 import { usePlaceMay } from '../may';
 import { readAgainIn } from '../gradings/feed';
-import classes from '../gradings/feed.module.css';
+import { Stack } from '@/ui/layout';
 
 type TaskPath = { org: string; contest: string; task: string };
 
@@ -26,7 +26,7 @@ export function GradingsSection({ path }: { path: TaskPath }) {
     ),
   );
   return (
-    <div className={classes.stack}>
+    <Stack gap="sm">
       <GradingsList
         path={path}
         view={view}
@@ -34,6 +34,6 @@ export function GradingsSection({ path }: { path: TaskPath }) {
         rejudge={may.manage ? { task: path.task, button: 'Rejudge' } : null}
         empty="Nothing has been graded yet."
       />
-    </div>
+    </Stack>
   );
 }

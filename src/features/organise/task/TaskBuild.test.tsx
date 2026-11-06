@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
-import { delay, http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse, type RequestHandler } from 'msw';
 import type {
   DeclaredInput,
   SaveRequest,
@@ -10,10 +10,9 @@ import type {
   WorkflowItem,
 } from '@/api/types';
 import { partTransfer } from '@/test/part-uploads';
-import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { CLASSIC, PRIMITIVES } from '@/test/workflows';
-import { afterAnswers, problem, server, signedIn } from '@/test/server';
+import { CLASSIC, PRIMITIVES, workflowItem } from '@/test/workflows';
+import { afterAnswers, problem, server, signedIn, signedInAs } from '@/test/server';
 import {
   TASK_API,
   CONTEST_API,
@@ -25,8 +24,11 @@ import {
   settingsOf,
   taskState,
   unchanged,
+  fileContent,
+  published,
+  treeEntry,
 } from '@/test/organiser';
-import { taskFileOf, taskValuesOf } from '@/test/task-values';
+import { declared, taskFileOf, taskValuesOf } from '@/test/task-values';
 import {
   comeBackToTab,
   fakeLiveStream,
@@ -62,22 +64,19 @@ submissions:
 const LISTED_AT = '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432';
 
 function file(path: string, size = 4, version: string | null = LISTED_AT): TreeEntry {
-  return {
+  return treeEntry({
     path,
-    kind: 'file',
     size,
-    upload: null,
-    start: null,
     token: `token-${path}`,
     version,
     href:
       version === null
         ? null
         : `/-/downloads/acme/spring/sum/versions/${version}/${path}`,
-  };
+  });
 }
 
-/** A workflow form whose workflow cannot be read, so the cards edit the entries there are. */
+/** A workflow form whose workflow cannot be read. */
 const UNREAD: WorkflowForm = {
   workflow: 'unicon/checked@v1',
   inputs: [],
@@ -87,23 +86,6 @@ const UNREAD: WorkflowForm = {
   yanked: null,
   text_values: null,
 };
-
-function declared(
-  id: string,
-  type: string,
-  more: Partial<DeclaredInput> = {},
-): DeclaredInput {
-  return {
-    id,
-    type,
-    options: null,
-    optional: false,
-    title: null,
-    help: null,
-    unit: null,
-    ...more,
-  };
-}
 
 /** What unicon/checked@v1 declares, as the backend reads it. */
 const CHECKED: WorkflowForm = {
@@ -152,34 +134,17 @@ const TUNABLE_YAML = CHECKED_YAML.replace('  checker: file\n', '').replace(
 );
 
 const WORKFLOWS: WorkflowItem[] = [
-  {
-    description: '',
-    yanked: {},
+  workflowItem({
     owner: 'unicon',
     name: 'checked',
     versions: ['v1', 'v3'],
     editable: false,
     visibility: 'public',
-  },
-  {
-    description: '',
-    yanked: {},
-    owner: 'my-org',
-    name: 'tunable',
-    versions: ['v1'],
-    editable: true,
-    visibility: 'private',
-  },
+  }),
+  workflowItem({ owner: 'my-org', name: 'tunable' }),
 ];
 
-const PUBLISHED = {
-  number: 4,
-  grading_changed: true,
-  changes: [],
-  notes: [],
-  regraded: 0,
-  effect: unchanged,
-};
+const PUBLISHED = published({ number: 4, grading_changed: true });
 
 /**
  * The sum task with its settings as above, read and saved as values, and its
@@ -244,17 +209,17 @@ function taskBackend(
     }),
     ...repoFiles,
   );
-  if (options.contest !== undefined) {
+  const { contest } = options;
+  if (contest !== undefined) {
     server.use(
       http.get(`${CONTEST_API}/files/:path`, () =>
-        HttpResponse.json({
-          path: 'contest.yaml',
-          encoding: 'utf-8',
-          content: options.contest,
-          token: 'token-contest',
-          upload: null,
-          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-        }),
+        HttpResponse.json(
+          fileContent({
+            path: 'contest.yaml',
+            content: contest,
+            token: 'token-contest',
+          }),
+        ),
       ),
     );
   }
@@ -267,7 +232,7 @@ function taskBackend(
 }
 
 function asManager() {
-  server.use(signedIn, ...holding('manager', publishedTask));
+  server.use(...signedInAs('manager', { task: publishedTask }));
 }
 
 function fill(field: HTMLElement, value: string) {
@@ -295,6 +260,34 @@ async function openTask() {
   const tests = screen.getByRole('region', { name: 'Submissions' });
   const workflow = screen.getByRole('region', { name: 'Workflow' });
   return { inputs, tests, workflow };
+}
+
+/** The task opened by its manager, its checker stored as checker/checker.cpp. */
+async function openWithChecker(form: WorkflowForm, ...handlers: RequestHandler[]) {
+  const backend = taskBackend({ form });
+  asManager();
+  server.use(
+    http.get(`${TASK_API}/tree`, ({ request }) =>
+      new URL(request.url).searchParams.get('path') === 'checker'
+        ? HttpResponse.json([file('checker/checker.cpp', 21)])
+        : undefined,
+    ),
+    http.get(`${TASK_API}/files/:path`, ({ params }) =>
+      decodeURIComponent(String(params['path'])) === 'checker/checker.cpp'
+        ? HttpResponse.json(
+            fileContent({
+              path: 'checker/checker.cpp',
+              content: 'int main() { return 0; }\n',
+              token: 'token-checker',
+            }),
+          )
+        : undefined,
+    ),
+    ...handlers,
+  );
+  const opened = await openTask();
+  const checker = within(opened.inputs).getByRole('group', { name: 'checker' });
+  return { ...backend, ...opened, checker };
 }
 
 async function save() {
@@ -471,31 +464,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
   });
 
   it('views and replaces a setting’s file in its box, saving the new one with the task and taking out the old (M51)', async () => {
-    const { sent } = taskBackend({ form: CHECKED });
-    asManager();
-    server.use(
-      http.get(`${TASK_API}/tree`, ({ request }) =>
-        new URL(request.url).searchParams.get('path') === 'checker'
-          ? HttpResponse.json([file('checker/checker.cpp', 21)])
-          : undefined,
-      ),
-      http.get(`${TASK_API}/files/:path`, ({ params }) =>
-        decodeURIComponent(String(params['path'])) === 'checker/checker.cpp'
-          ? HttpResponse.json({
-              path: 'checker/checker.cpp',
-              encoding: 'utf-8',
-              content: 'int main() { return 0; }\n',
-              token: 'token-checker',
-              upload: null,
-              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-            })
-          : undefined,
-      ),
-    );
+    const { sent, checker } = await openWithChecker(CHECKED);
     const user = userEvent.setup();
-    const { inputs } = await openTask();
 
-    const checker = within(inputs).getByRole('group', { name: 'checker' });
     expect(await within(checker).findByText('checker.cpp, 21 B')).toBeVisible();
     expect(within(checker).queryByRole('textbox')).toBeNull();
     await user.click(within(checker).getByRole('button', { name: 'View checker' }));
@@ -543,19 +514,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
   });
 
   it('puts a setting’s file back as it was on Undo', async () => {
-    taskBackend({ form: CHECKED });
-    asManager();
-    server.use(
-      http.get(`${TASK_API}/tree`, ({ request }) =>
-        new URL(request.url).searchParams.get('path') === 'checker'
-          ? HttpResponse.json([file('checker/checker.cpp', 21)])
-          : undefined,
-      ),
-    );
+    const { checker } = await openWithChecker(CHECKED);
     const user = userEvent.setup();
-    const { inputs } = await openTask();
 
-    const checker = within(inputs).getByRole('group', { name: 'checker' });
     await within(checker).findByText('checker.cpp, 21 B');
     await user.click(within(checker).getByRole('button', { name: 'Replace checker' }));
     await user.upload(
@@ -574,26 +535,8 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
   });
 
   it('offers an upload the door holds for a setting in its box, staging it for the save rather than saving (#570)', async () => {
-    const { sent } = taskBackend({ form: CHECKED });
-    asManager();
-    server.use(
-      http.get(`${TASK_API}/tree`, ({ request }) =>
-        new URL(request.url).searchParams.get('path') === 'checker'
-          ? HttpResponse.json([file('checker/checker.cpp', 21)])
-          : undefined,
-      ),
-      http.get(`${TASK_API}/files/:path`, ({ params }) =>
-        decodeURIComponent(String(params['path'])) === 'checker/checker.cpp'
-          ? HttpResponse.json({
-              path: 'checker/checker.cpp',
-              encoding: 'utf-8',
-              content: 'int main() { return 0; }\n',
-              token: 'token-checker',
-              upload: null,
-              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-            })
-          : undefined,
-      ),
+    const { sent, checker } = await openWithChecker(
+      CHECKED,
       http.get(`${TASK_API}/organise/part-uploads`, () =>
         HttpResponse.json([
           {
@@ -608,9 +551,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       ),
     );
     const user = userEvent.setup();
-    const { inputs } = await openTask();
 
-    const checker = within(inputs).getByRole('group', { name: 'checker' });
     await within(checker).findByText('checker.cpp, 21 B');
     const offered = await within(checker).findByRole('button', {
       name: 'Use uploaded: big.bin, 300 KB, for checker',
@@ -664,30 +605,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
   describe('a file chosen for a setting, through a change of workflow', () => {
     /** The checker replaced by checker.py, waiting for the save. */
     async function replaceChecker(form: WorkflowForm) {
-      const backend = taskBackend({ form });
-      asManager();
-      server.use(
-        http.get(`${TASK_API}/tree`, ({ request }) =>
-          new URL(request.url).searchParams.get('path') === 'checker'
-            ? HttpResponse.json([file('checker/checker.cpp', 21)])
-            : undefined,
-        ),
-        http.get(`${TASK_API}/files/:path`, ({ params }) =>
-          decodeURIComponent(String(params['path'])) === 'checker/checker.cpp'
-            ? HttpResponse.json({
-                path: 'checker/checker.cpp',
-                encoding: 'utf-8',
-                content: 'int main() { return 0; }\n',
-                token: 'token-checker',
-                upload: null,
-                version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-              })
-            : undefined,
-        ),
-      );
+      const opened = await openWithChecker(form);
+      const { checker } = opened;
       const user = userEvent.setup();
-      const opened = await openTask();
-      const checker = within(opened.inputs).getByRole('group', { name: 'checker' });
       await within(checker).findByText('checker.cpp, 21 B');
       await user.click(
         within(checker).getByRole('button', { name: 'Replace checker' }),
@@ -697,7 +617,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
         new File(['print(1)\n'], 'checker.py'),
       );
       await within(checker).findByText('checker.py, 9 B');
-      return { ...backend, ...opened };
+      return opened;
     }
 
     it('stays, the setting naming it, when the new version still takes that input as a file', async () => {
@@ -1008,16 +928,56 @@ repeat:
     });
   });
 
-  it('edits the inputs the settings hold when the workflow cannot be read', async () => {
-    taskBackend();
-    const { inputs } = await openTask();
+  it('asks for a workflow, with why, when the saved one cannot be read, and saves the inputs as they are', async () => {
+    const { sent } = taskBackend();
+    const { inputs, tests } = await openTask();
 
+    expect(within(inputs).getByText('Choose a workflow.')).toBeVisible();
     expect(
-      within(inputs).getByText(/The workflow unicon\/checked@v1 cannot be read\./),
+      within(inputs).getByText('The workflow unicon/checked@v1 cannot be read.'),
     ).toBeVisible();
+    expect(within(inputs).queryAllByRole('textbox')).toHaveLength(0);
+    expect(within(inputs).queryAllByRole('group')).toHaveLength(0);
+
+    fill(within(tests).getByLabelText('Most submissions'), '20');
+    await save();
+    expect(written(await waitForSave(sent))['inputs']).toEqual({
+      submission: { entrant: { label: 'Your solution', max_size: '1MB' } },
+      language: { entrant: { options: ['cpp', 'python'], default: 'cpp' } },
+      checker: 'checker/checker.cpp',
+      time_limit: 2,
+      token: { secret: 'judge-token' },
+    });
+  });
+
+  it('asks for a workflow, with why, when the task names none, and shows its inputs once one is chosen', async () => {
+    taskBackend({
+      content: 'name: Sum\n',
+      form: {
+        ...UNREAD,
+        workflow: null,
+        problem: 'The task does not name a workflow yet. Choose one.',
+      },
+    });
+    asManager();
+    const { inputs, workflow } = await openTask();
+
+    expect(within(inputs).getByText('Choose a workflow.')).toBeVisible();
     expect(
-      within(inputs).getByLabelText('Another input, by its name in the workflow'),
+      within(inputs).getByText('The task does not name a workflow yet. Choose one.'),
     ).toBeVisible();
+    expect(within(inputs).queryAllByRole('textbox')).toHaveLength(0);
+
+    await userEvent.click(
+      await within(workflow).findByRole('button', { name: 'Choose a workflow' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Choose my-org/tunable' }),
+    );
+    expect(
+      await within(inputs).findByRole('group', { name: 'Time limit (seconds)' }),
+    ).toBeVisible();
+    expect(within(inputs).queryByText('Choose a workflow.')).toBeNull();
   });
 
   it('says settings that do not read as settings, such as an upload, cannot be shown as cards', async () => {
@@ -1042,7 +1002,7 @@ repeat:
 
   it('keeps an observer’s fields readable, hides changes, and links the role chip to task organisers', async () => {
     taskBackend({ form: CHECKED });
-    server.use(signedIn, ...holding('observer', publishedTask));
+    server.use(...signedInAs('observer', { task: publishedTask }));
     const { inputs } = await openTask();
     expect(fieldIn(inputs, 'Time limit (seconds)', /^Time limit/)).toBeDisabled();
     const scoring = screen.getByRole('region', { name: 'Scoring' });
@@ -1085,10 +1045,10 @@ repeat:
 
   it('refuses the save, rather than merging, when someone else saved the settings first', async () => {
     const theirs = TASK.replace('time_limit: 2', 'time_limit: 5');
-    const { sent } = taskBackend({ conflictWith: theirs });
+    const { sent } = taskBackend({ conflictWith: theirs, form: CHECKED });
     const { inputs, tests } = await openTask();
 
-    fill(fieldIn(inputs, 'time_limit', 'Value'), '3');
+    fill(fieldIn(inputs, 'Time limit (seconds)', /^Time limit/), '3');
     fill(within(tests).getByLabelText('Most submissions'), '20');
     await save();
 
@@ -1097,7 +1057,7 @@ repeat:
     ).toBeVisible();
     expect(screen.queryByRole('list', { name: 'Fields that differ' })).toBeNull();
     expect(sent).toHaveLength(1);
-    expect(fieldIn(inputs, 'time_limit', 'Value')).toHaveValue('3');
+    expect(fieldIn(inputs, 'Time limit (seconds)', /^Time limit/)).toHaveValue('3');
   });
 });
 
@@ -1106,21 +1066,21 @@ describe('the cards while the task is being changed', { timeout: 30_000 }, () =>
   afterEach(realLiveStream);
 
   it('keep what was changed, and do not spin, when the tab comes back, and meet someone else’s save at the save', async () => {
-    const { sent, elsewhere } = taskBackend();
+    const { sent, elsewhere } = taskBackend({ form: CHECKED });
     const { inputs, tests } = await openTask();
     openStream();
-    fill(fieldIn(inputs, 'time_limit', 'Value'), '3');
+    fill(fieldIn(inputs, 'Time limit (seconds)', /^Time limit/), '3');
     fill(within(tests).getByLabelText('Most submissions'), '20');
 
     // Someone else saves the task meanwhile, and a submission is graded.
     elsewhere({
       content: TASK.replace('time_limit: 2', 'time_limit: 5'),
-      form: { ...UNREAD, graded: true },
+      form: { ...CHECKED, graded: true },
     });
     await afterAnswers(comeBackToTab);
 
     const cards = screen.getByRole('region', { name: 'Inputs' });
-    expect(fieldIn(cards, 'time_limit', 'Value')).toHaveValue('3');
+    expect(fieldIn(cards, 'Time limit (seconds)', /^Time limit/)).toHaveValue('3');
     expect(
       within(screen.getByRole('region', { name: 'Submissions' })).getByLabelText(
         'Most submissions',
@@ -1144,7 +1104,7 @@ describe('the cards while the task is being changed', { timeout: 30_000 }, () =>
 describe('reloading at a conflict', { timeout: 30_000 }, () => {
   it('drops my changes and shows the settings as they are now', async () => {
     const theirs = TASK.replace('time_limit: 2', 'time_limit: 5');
-    taskBackend({ conflictWith: theirs });
+    taskBackend({ conflictWith: theirs, form: CHECKED });
     const { tests } = await openTask();
 
     fill(within(tests).getByLabelText('Most submissions'), '20');
@@ -1839,7 +1799,7 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
         declared('input', 'file'),
       ]),
     });
-    server.use(signedIn, ...holding('observer', publishedTask));
+    server.use(...signedInAs('observer', { task: publishedTask }));
     await openTask();
     const scoring = screen.getByRole('region', { name: 'Scoring' });
     const line = await within(scoring).findByRole('textbox', { name: 'total' });

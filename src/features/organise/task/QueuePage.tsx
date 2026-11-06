@@ -12,7 +12,7 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { MISSING } from '@/ui/number/words';
 import { ScoredResult } from '@/ui/scored/ScoredResult';
 import { useTaskParams } from '@/lib/route-params';
@@ -72,59 +72,62 @@ function Queue({
   );
   const [unmarked, setUnmarked] = useState(false);
   const [board, setBoard] = useState('');
-  if (view.state === 'loading') return <PageSkeleton />;
   if (isUnpublished(view)) return <BodyText tone="secondary">{UNPUBLISHED}</BodyText>;
-  if (view.state === 'error')
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
-  const boards = leaderboardsOf(view.data);
-  const rows = view.data
-    .map((row) => ({
-      ...row,
-      submissions: row.submissions.filter(
-        (item) => item.marks.length > 0 && shows(item, unmarked, board),
-      ),
-    }))
-    .filter((row) => row.submissions.length > 0);
   return (
-    <div className={classes.stack}>
-      <Checkbox label="Unmarked only" checked={unmarked} onChange={setUnmarked} />
-      {boards.length > 0 && (
-        <Select
-          label="Leaderboard"
-          value={board}
-          placeholder="Every leaderboard"
-          options={boards.map((key) => ({ value: key, label: key }))}
-          onChange={setBoard}
-        />
-      )}
-      {rows.length === 0 ? (
-        <BodyText tone="secondary">Nothing is waiting for a mark.</BodyText>
-      ) : (
-        rows.map((row) => (
-          <Card key={row.row.entrant}>
-            <div className={classes.stack}>
-              <SectionTitle>
-                {row.row.name === '' ? MISSING : row.row.name}
-              </SectionTitle>
-              <BodyText tone="secondary">
-                Closed {formatDateTime(new Date(row.closed_at))}
-              </BodyText>
-              {row.submissions.map((item) => (
-                <Submission
-                  key={item.number}
-                  org={org}
-                  contest={contest}
-                  task={task}
-                  entrant={row.row.entrant}
-                  submission={item}
-                  manager={manager}
-                />
-              ))}
-            </div>
-          </Card>
-        ))
-      )}
-    </div>
+    <Loaded view={view}>
+      {(queue) => {
+        const boards = leaderboardsOf(queue);
+        const rows = queue
+          .map((row) => ({
+            ...row,
+            submissions: row.submissions.filter(
+              (item) => item.marks.length > 0 && shows(item, unmarked, board),
+            ),
+          }))
+          .filter((row) => row.submissions.length > 0);
+        return (
+          <div className={classes.stack}>
+            <Checkbox label="Unmarked only" checked={unmarked} onChange={setUnmarked} />
+            {boards.length > 0 && (
+              <Select
+                label="Leaderboard"
+                value={board}
+                placeholder="Every leaderboard"
+                options={boards.map((key) => ({ value: key, label: key }))}
+                onChange={setBoard}
+              />
+            )}
+            {rows.length === 0 ? (
+              <BodyText tone="secondary">Nothing is waiting for a mark.</BodyText>
+            ) : (
+              rows.map((row) => (
+                <Card key={row.row.entrant}>
+                  <div className={classes.stack}>
+                    <SectionTitle>
+                      {row.row.name === '' ? MISSING : row.row.name}
+                    </SectionTitle>
+                    <BodyText tone="secondary">
+                      Closed {formatDateTime(new Date(row.closed_at))}
+                    </BodyText>
+                    {row.submissions.map((item) => (
+                      <Submission
+                        key={item.number}
+                        org={org}
+                        contest={contest}
+                        task={task}
+                        entrant={row.row.entrant}
+                        submission={item}
+                        manager={manager}
+                      />
+                    ))}
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        );
+      }}
+    </Loaded>
   );
 }
 
@@ -305,28 +308,31 @@ function StaffSubmission({
       { params: { path: { org, contest, task, number }, query: { entrant } } },
     ),
   );
-  if (view.state === 'loading') return <PageSkeleton rows={2} />;
-  if (view.state === 'error')
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
-  const where = { org, contest, task, number };
-  const grading = view.data.grading;
   return (
-    <div className={classes.stack}>
-      {files.state === 'error' && (
-        <ErrorBlock error={files.error} onRetry={files.retry} />
-      )}
-      {files.state === 'ready' && <StaffFiles where={where} files={files.data} />}
-      {grading === null ? (
-        <BodyText tone="secondary">Not graded</BodyText>
-      ) : (
-        <>
-          <BodyText tone="secondary">{STATUS[grading.status]}</BodyText>
-          <ScoredResult
-            grading={grading}
-            readText={(ask) => staffText(where, entrant, ask)}
-          />
-        </>
-      )}
-    </div>
+    <Loaded view={view} rows={2}>
+      {(submission) => {
+        const where = { org, contest, task, number };
+        const grading = submission.grading;
+        return (
+          <div className={classes.stack}>
+            {files.state === 'error' && (
+              <ErrorBlock error={files.error} onRetry={files.retry} />
+            )}
+            {files.state === 'ready' && <StaffFiles where={where} files={files.data} />}
+            {grading === null ? (
+              <BodyText tone="secondary">Not graded</BodyText>
+            ) : (
+              <>
+                <BodyText tone="secondary">{STATUS[grading.status]}</BodyText>
+                <ScoredResult
+                  grading={grading}
+                  readText={(ask) => staffText(where, entrant, ask)}
+                />
+              </>
+            )}
+          </div>
+        );
+      }}
+    </Loaded>
   );
 }

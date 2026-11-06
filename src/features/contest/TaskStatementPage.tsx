@@ -9,8 +9,7 @@ import { PageLink } from '@/ui/PageLink';
 import { PageTitle } from '@/ui/PageTitle';
 import { BackToOrganising } from './BackToOrganising';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { contestHomePath } from '@/lib/contest-paths';
 import { useTaskParams } from '@/lib/route-params';
 import { contestViewSectionPath } from '@/lib/sections';
@@ -19,11 +18,13 @@ import { TaskAnnouncements } from './threads/AnnouncementList';
 import { ASK_ABOUT } from './threads/questions';
 import { BySession } from './BySession';
 import { SignInPrompt } from './SignInPrompt';
-import { TaskCountdown } from './TaskCountdown';
 import { TaskSubmissions } from './submit/TaskSubmissions';
 import { readShownFiles } from './submit/download';
 import { ShownTask } from '@/ui/scored/ShownInputs';
+import { Countdown } from '@/ui/Countdown';
+import { Stack } from '@/ui/layout';
 import { headingOf } from '@/lib/task-names';
+import { taskCountdown } from './time-left';
 import classes from './contest.module.css';
 
 /** How often the page is read again, so a release or an extension reaches it. */
@@ -77,7 +78,7 @@ function Back({ org, contest }: { org: string; contest: string }) {
  */
 function NoSuchTask({ org, contest }: { org: string; contest: string }) {
   return (
-    <div className={classes.page}>
+    <Stack gap="md">
       <div className={classes.links}>
         <Back org={org} contest={contest} />
       </div>
@@ -86,7 +87,7 @@ function NoSuchTask({ org, contest }: { org: string; contest: string }) {
         It is not released yet, the organisers took it out of the contest, or the
         address is wrong. The contest’s page lists the tasks you can open.
       </BodyText>
-    </div>
+    </Stack>
   );
 }
 
@@ -153,48 +154,53 @@ function SignedInTask({
     });
   }, [queryClient, org, contest, task]);
 
-  if (view.state === 'loading') return <PageSkeleton rows={6} />;
-  if (view.state === 'error') {
-    if (view.error.status === 404) return <NoSuchTask org={org} contest={contest} />;
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
-  }
-
-  const page = view.data;
-  const asks = page.release.closed !== 'not_approved';
+  if (view.state === 'error' && view.error.status === 404)
+    return <NoSuchTask org={org} contest={contest} />;
   return (
-    <div className={classes.page}>
-      <div className={classes.links}>
-        <Back org={org} contest={contest} />
-        <BackToOrganising org={org} contest={contest} />
-      </div>
-      <PageTitle>{headingOf(page)}</PageTitle>
-      <TaskCountdown due={page.due} closes={page.closes} onBoundary={readAgain} />
-      {asks && (
-        <div className={classes.links}>
-          <PageLink
-            to={`${contestViewSectionPath(org, contest, 'questions')}?${ASK_ABOUT}=${encodeURIComponent(task)}`}
-          >
-            Ask a question about this task
-          </PageLink>
-        </div>
-      )}
-      <TaskAnnouncements org={org} contest={contest} task={task} />
-      <Card>
-        <Markdown task={{ org, contest, task }}>{page.statement}</Markdown>
-      </Card>
-      <Shown
-        where={{ org, contest, task }}
-        runs={page.runs}
-        inputs={page.shown_inputs}
-      />
-      <Card>
-        <div className={classes.stack}>
-          <SectionTitle>Limits</SectionTitle>
-          <LimitList page={page} />
-        </div>
-      </Card>
-      <TaskSubmissions org={org} contest={contest} task={task} page={page} />
-    </div>
+    <Loaded view={view} rows={6}>
+      {(page) => {
+        const asks = page.release.closed !== 'not_approved';
+        return (
+          <Stack gap="md">
+            <div className={classes.links}>
+              <Back org={org} contest={contest} />
+              <BackToOrganising org={org} contest={contest} />
+            </div>
+            <PageTitle>{headingOf(page)}</PageTitle>
+            <Countdown
+              {...taskCountdown(page.due, page.closes)}
+              onBoundary={readAgain}
+              row
+            />
+            {asks && (
+              <div className={classes.links}>
+                <PageLink
+                  to={`${contestViewSectionPath(org, contest, 'questions')}?${ASK_ABOUT}=${encodeURIComponent(task)}`}
+                >
+                  Ask a question about this task
+                </PageLink>
+              </div>
+            )}
+            <TaskAnnouncements org={org} contest={contest} task={task} />
+            <Card>
+              <Markdown task={{ org, contest, task }}>{page.statement}</Markdown>
+            </Card>
+            <Shown
+              where={{ org, contest, task }}
+              runs={page.runs}
+              inputs={page.shown_inputs}
+            />
+            <Card>
+              <div className={classes.stack}>
+                <SectionTitle>Limits</SectionTitle>
+                <LimitList page={page} />
+              </div>
+            </Card>
+            <TaskSubmissions org={org} contest={contest} task={task} page={page} />
+          </Stack>
+        );
+      }}
+    </Loaded>
   );
 }
 
@@ -217,29 +223,27 @@ function PublicTask({
     }),
   );
 
-  if (view.state === 'loading') return <PageSkeleton rows={6} />;
-  if (view.state === 'error') {
-    if (view.error.status === 404) {
-      return (
-        <SignInPrompt
-          title="Sign in to see this task"
-          back={<Back org={org} contest={contest} />}
-        />
-      );
-    }
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
+  if (view.state === 'error' && view.error.status === 404) {
+    return (
+      <SignInPrompt
+        title="Sign in to see this task"
+        back={<Back org={org} contest={contest} />}
+      />
+    );
   }
-
-  const { task: found, statement, runs, shown_inputs: inputs } = view.data;
   return (
-    <div className={classes.page}>
-      <Back org={org} contest={contest} />
-      <PageTitle>{headingOf(found)}</PageTitle>
-      <Card>
-        <Markdown task={{ org, contest, task }}>{statement}</Markdown>
-      </Card>
-      <Shown where={{ org, contest, task }} runs={runs} inputs={inputs} />
-    </div>
+    <Loaded view={view} rows={6}>
+      {({ task: found, statement, runs, shown_inputs: inputs }) => (
+        <Stack gap="md">
+          <Back org={org} contest={contest} />
+          <PageTitle>{headingOf(found)}</PageTitle>
+          <Card>
+            <Markdown task={{ org, contest, task }}>{statement}</Markdown>
+          </Card>
+          <Shown where={{ org, contest, task }} runs={runs} inputs={inputs} />
+        </Stack>
+      )}
+    </Loaded>
   );
 }
 

@@ -4,9 +4,8 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { Holder } from '@/api/types';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { problem, server, signedIn, signedInAs, someone } from '@/test/server';
 import { contestList, taskList } from '@/test/organiser';
-import { holding } from '@/test/may';
 
 const ORG_ROLES = '/api/v1/orgs/:org/roles';
 const CONTEST_ROLES = '/api/v1/orgs/:org/contests/:contest/roles';
@@ -189,8 +188,7 @@ describe('the organisers section', () => {
 
   it('offers a manager only the roles a manager may give, as Invite does', async () => {
     server.use(
-      signedIn,
-      ...holding('manager'),
+      ...signedInAs('manager'),
       taskList,
       http.get(CONTEST_ROLES, () =>
         HttpResponse.json([
@@ -233,8 +231,7 @@ describe('the organisers section', () => {
   it('keeps a refusal about the role that was sent while another is picked', async () => {
     server.use(
       // An admin whose admin role was taken away since the page was read.
-      signedIn,
-      ...holding('admin'),
+      ...signedInAs('admin'),
       taskList,
       http.get(CONTEST_ROLES, () =>
         HttpResponse.json([
@@ -275,8 +272,7 @@ describe('the organisers section', () => {
 
   it('does not promise contest entrant access to a task-only role', async () => {
     server.use(
-      signedIn,
-      ...holding('observer'),
+      ...signedInAs('observer'),
       taskList,
       http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/roles', () =>
         HttpResponse.json([]),
@@ -293,8 +289,7 @@ describe('the organisers section', () => {
 
   it('shows an observer the list and nothing to change', async () => {
     server.use(
-      signedIn,
-      ...holding('observer'),
+      ...signedInAs('observer'),
       http.get(ORG_ROLES, () => HttpResponse.json([holder({}, { may_change: false })])),
     );
     renderApp('/orgs/acme/organisers');
@@ -319,9 +314,8 @@ describe('the organisers section', () => {
 
   it('is not shown to someone whose role is only at one of the tasks', async () => {
     server.use(
-      signedIn,
       // A manager of one of its tasks alone may do nothing at the contest.
-      ...holding(null),
+      ...signedInAs(null),
     );
     renderApp('/orgs/acme/contests/spring/organisers');
 

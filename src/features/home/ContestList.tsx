@@ -3,8 +3,7 @@ import type { ContestSummary } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { contestHomePath } from '@/lib/contest-paths';
 import { formatDateTime } from '@/lib/time';
 import classes from './HomePage.module.css';
@@ -58,9 +57,9 @@ function ContestSection({ title, view }: { title: string; view: QueryView<Listed
   return (
     <section className={classes.section}>
       <SectionTitle>{title}</SectionTitle>
-      {view.state === 'loading' && <PageSkeleton rows={2} />}
-      {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
-      {view.state === 'ready' && <Contests label={title} contests={view.data} />}
+      <Loaded view={view} rows={2}>
+        {(contests) => <Contests label={title} contests={contests} />}
+      </Loaded>
     </section>
   );
 }

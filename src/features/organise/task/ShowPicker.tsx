@@ -21,6 +21,7 @@ import {
   type ShowKind,
 } from './scoring-model';
 import { FIRST_NOT_PASSED } from '@/ui/scored/scored-text';
+import { Group } from '@/ui/layout';
 import classes from './task.module.css';
 
 /** A part `show` can name, by its name, as the grid calls it. */
@@ -178,7 +179,7 @@ export function ShowPicker({
               <tbody key={of} aria-label={`Runs: ${ofLabel(of)}`}>
                 <tr>
                   <th colSpan={4} scope="colgroup" className={classes.showSection}>
-                    <div className={classes.showEntry}>
+                    <Group gap={6}>
                       <Select
                         label="Runs of"
                         labelHidden
@@ -208,7 +209,7 @@ export function ShowPicker({
                           }}
                         />
                       )}
-                    </div>
+                    </Group>
                   </th>
                 </tr>
                 {withListed(fields, listedFields).map((row) => (

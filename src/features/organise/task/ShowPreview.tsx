@@ -15,6 +15,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { Grading } from '@/ui/scored/Grading';
 import { ShownTask } from '@/ui/scored/ShownInputs';
+import { Group } from '@/ui/layout';
 import { useSettled } from '@/lib/use-settled';
 import { definitionErrorsOf } from '../files/refusals';
 import { taskPath, type TaskPlace } from './build-data';
@@ -117,7 +118,7 @@ export function ShowPreview({
 
   return (
     <div className={classes.preview}>
-      <div className={classes.previewControls}>
+      <Group gap="10px 24px" align="flex-start">
         <RadioGroup
           label="Moment"
           value={moment}
@@ -140,7 +141,7 @@ export function ShowPreview({
           ]}
           onChange={setPicked}
         />
-      </div>
+      </Group>
       {state.isError ? (
         <ErrorBlock error={state.error} onRetry={() => void state.refetch()} />
       ) : state.data !== undefined && published === null ? (

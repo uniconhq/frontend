@@ -13,7 +13,6 @@ import { definitionErrorsOf } from '../files/refusals';
 import { SaveOutcome } from '../files/SaveOutcome';
 import { useOwnSettings } from '../forms/settings-hooks';
 import {
-  emptyInput,
   emptyTuple,
   heldTheOtherWay,
   readTask,
@@ -55,9 +54,9 @@ import { SubmissionsCard } from './SubmissionsCard';
 import { WorkflowCard } from './WorkflowCard';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
+import { Stack } from '@/ui/layout';
 import { taskSectionPath } from '@/lib/sections';
 import shared from '../organise.module.css';
-import classes from './task.module.css';
 
 /** The workflow's inputs as the cards type them, for the workflow chosen. */
 function inputsFor(
@@ -386,7 +385,7 @@ function BuildForm({
   const placeOf = taskPlaceOf(place.org, place.contest, place.task, titles);
 
   return (
-    <div className={classes.build}>
+    <Stack gap="lg">
       {read.unreadable.length > 0 && (
         <Unread
           place={place}
@@ -408,7 +407,7 @@ function BuildForm({
         workflowProblem={
           declared !== null
             ? null
-            : picked === saved
+            : picked === (saved ?? '')
               ? (form?.problem ?? 'The workflow cannot be read.')
               : version.state === 'loading' && refParts(picked) !== null
                 ? 'Loading the chosen workflow.'
@@ -426,7 +425,6 @@ function BuildForm({
         onRemove={(id) =>
           set({ inputs: values.inputs.filter((input) => input.id !== id) })
         }
-        onAdd={(id, kind) => set({ inputs: [...values.inputs, emptyInput(id, kind)] })}
         files={files}
         disabled={disabled || pendingFiles > 0}
       />
@@ -545,7 +543,7 @@ function BuildForm({
           />
         )}
       </SaveBar>
-    </div>
+    </Stack>
   );
 }
 

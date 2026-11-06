@@ -4,10 +4,11 @@ import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Checkbox } from '@/ui/Checkbox';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { PageLink } from '@/ui/PageLink';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { TextInput } from '@/ui/TextInput';
+import { Group, Stack } from '@/ui/layout';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_SECTIONS, contestSectionPath, sectionOf } from '@/lib/sections';
 import { readContest, writeContest, type ContestValues } from '../forms/contest-values';
@@ -231,7 +232,7 @@ function WayCard({
             </>
           )}
           {!disabled && (
-            <div className={shared.actions}>
+            <Group gap="xs">
               <Button
                 size="xs"
                 variant="danger"
@@ -240,33 +241,23 @@ function WayCard({
               >
                 Remove this way
               </Button>
-            </div>
+            </Group>
           )}
-          <Modal
+          <ConfirmDialog
             opened={asking}
             onClose={() => setAsking(false)}
             title={`Remove ${title}?`}
+            confirm="Remove"
+            variant="danger"
+            onConfirm={() => {
+              setAsking(false);
+              onRemove();
+            }}
           >
-            <div className={shared.stack}>
-              <BodyText>
-                Nobody new comes in this way once it is saved. Those already in stay.
-              </BodyText>
-              <div className={shared.actions}>
-                <Button
-                  variant="danger"
-                  onClick={() => {
-                    setAsking(false);
-                    onRemove();
-                  }}
-                >
-                  Remove
-                </Button>
-                <Button variant="secondary" onClick={() => setAsking(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </Modal>
+            <BodyText>
+              Nobody new comes in this way once it is saved. Those already in stay.
+            </BodyText>
+          </ConfirmDialog>
         </Fieldset>
       </FieldBox>
     </li>
@@ -357,7 +348,7 @@ function EntryForm({
             </BodyText>
             <div className={classes.starters} role="group" aria-label="Start from">
               {STARTERS.map((starter) => (
-                <div key={starter.label} className={classes.starter}>
+                <Stack key={starter.label} gap={6} align="flex-start">
                   <Button
                     variant="secondary"
                     disabled={locked}
@@ -377,7 +368,7 @@ function EntryForm({
                     {starter.label}
                   </Button>
                   <BodyText tone="secondary">{starter.says}</BodyText>
-                </div>
+                </Stack>
               ))}
             </div>
           </div>
@@ -426,7 +417,7 @@ function EntryForm({
           </ol>
         )}
         {ways !== null && !locked && (
-          <div className={shared.actions}>
+          <Group gap="xs">
             <Button
               size="xs"
               variant="secondary"
@@ -459,7 +450,7 @@ function EntryForm({
                 Add invites
               </Button>
             )}
-          </div>
+          </Group>
         )}
       </Fieldset>
 
@@ -540,7 +531,7 @@ function EntryForm({
         </ul>
       )}
       {!locked && (
-        <div className={shared.actions}>
+        <Group gap="xs">
           <Button
             loading={busy}
             disabled={locked || !changed || problems.length > 0}
@@ -551,7 +542,7 @@ function EntryForm({
             Save how people enter
           </Button>
           {changed && <UnsavedNote />}
-        </div>
+        </Group>
       )}
     </div>
   );

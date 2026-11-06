@@ -1,6 +1,7 @@
 import { apiClient } from '@/api/client';
 import { $api, queryView } from '@/api/query';
 import type { InputField } from '@/api/types';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
 import { OutLink } from '@/ui/OutLink';
@@ -9,6 +10,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { Grading } from '@/ui/scored/Grading';
 import type { TextAsk } from '@/ui/scored/ScoredResult';
+import { Group } from '@/ui/layout';
 import { formatDateTime } from '@/lib/time';
 import { readShownFiles } from './download';
 import { nameOf, submittedItems } from '@/lib/submitted';
@@ -118,29 +120,29 @@ export function SubmissionDetail({
 
   return (
     <section className={shared.stack} aria-label={`Submission ${number}`}>
-      <div className={classes.heading}>
+      <Group gap="sm" align="baseline" justify="space-between">
         <SectionTitle>Submission #{number}</SectionTitle>
         <PageLink to={closeTo}>Close</PageLink>
-      </div>
-      {view.state === 'loading' && <PageSkeleton rows={3} />}
-      {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
-      {view.state === 'ready' && (
-        <>
-          <BodyText tone="secondary">
-            Submitted {formatDateTime(new Date(view.data.submitted_at))}
-          </BodyText>
-          <Files where={where} inputs={inputs} />
-          {view.data.grading === null ? (
-            <BodyText tone="secondary">Not graded</BodyText>
-          ) : (
-            <Grading
-              grading={view.data.grading}
-              readText={(ask) => readText(where, ask)}
-              readFiles={(ask) => readShownFiles(where, ask)}
-            />
-          )}
-        </>
-      )}
+      </Group>
+      <Loaded view={view}>
+        {(submission) => (
+          <>
+            <BodyText tone="secondary">
+              Submitted {formatDateTime(new Date(submission.submitted_at))}
+            </BodyText>
+            <Files where={where} inputs={inputs} />
+            {submission.grading === null ? (
+              <BodyText tone="secondary">Not graded</BodyText>
+            ) : (
+              <Grading
+                grading={submission.grading}
+                readText={(ask) => readText(where, ask)}
+                readFiles={(ask) => readShownFiles(where, ask)}
+              />
+            )}
+          </>
+        )}
+      </Loaded>
     </section>
   );
 }

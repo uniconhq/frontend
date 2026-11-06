@@ -3,8 +3,7 @@ import { $api, queryView } from '@/api/query';
 import type { components } from '@/api/schema';
 import { BodyText } from '@/ui/BodyText';
 import { Page, PageHeader } from '@/ui/Page';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { MISSING } from '@/ui/number/words';
 import { useContestParams } from '@/lib/route-params';
 
@@ -35,30 +34,35 @@ function Regrade({
   const view = queryView(
     $api.useQuery('get', READ, { params: { path: { org, contest, task, regrade } } }),
   );
-  if (view.state === 'loading') return <PageSkeleton />;
-  if (view.state === 'error')
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
-  const boards = view.data.leaderboards;
   return (
-    <Page>
-      <PageHeader title="Regrade" />
-      {view.data.running > 0 && (
-        <BodyText tone="secondary">{`${String(view.data.running)} still running.`}</BodyText>
-      )}
-      {view.data.unread > 0 && (
-        <BodyText tone="secondary">{`${String(view.data.unread)} cannot be compared.`}</BodyText>
-      )}
-      {boards !== null && boards.length === 0 && (
-        <BodyText tone="secondary">No leaderboard reads this task.</BodyText>
-      )}
-      {boards !== null &&
-        boards.map((board) => <BoardDiff key={board.leaderboard} board={board} />)}
-      <Changes
-        changed={view.data.changed}
-        more={view.data.more_changed}
-        values={boards === null || boards.length === 0}
-      />
-    </Page>
+    <Loaded view={view}>
+      {(data) => {
+        const boards = data.leaderboards;
+        return (
+          <Page>
+            <PageHeader title="Regrade" />
+            {data.running > 0 && (
+              <BodyText tone="secondary">{`${String(data.running)} still running.`}</BodyText>
+            )}
+            {data.unread > 0 && (
+              <BodyText tone="secondary">{`${String(data.unread)} cannot be compared.`}</BodyText>
+            )}
+            {boards !== null && boards.length === 0 && (
+              <BodyText tone="secondary">No leaderboard reads this task.</BodyText>
+            )}
+            {boards !== null &&
+              boards.map((board) => (
+                <BoardDiff key={board.leaderboard} board={board} />
+              ))}
+            <Changes
+              changed={data.changed}
+              more={data.more_changed}
+              values={boards === null || boards.length === 0}
+            />
+          </Page>
+        );
+      }}
+    </Loaded>
   );
 }
 

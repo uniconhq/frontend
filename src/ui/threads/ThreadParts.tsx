@@ -1,3 +1,4 @@
+import { Group } from '@mantine/core';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Announcement, AnnouncementLink, Clarification } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -169,7 +170,7 @@ export function QuestionThread({
   ];
   return (
     <article className={classes.question} aria-label={title}>
-      <div className={classes.questionHead}>
+      <Group gap="8px 12px" align="flex-start" justify="space-between" wrap="nowrap">
         <div className={classes.questionTitle}>
           <h3 className={classes.title}>{title}</h3>
           {(where !== undefined || clarification.task !== null) && (
@@ -186,7 +187,7 @@ export function QuestionThread({
           )}
         </div>
         <QuestionBadge clarification={clarification} organisers={organisers} />
-      </div>
+      </Group>
       <ol className={classes.conversation} aria-label={`Messages on ${title}`}>
         {said.map((message, index) => (
           <li

@@ -1,16 +1,13 @@
 import { useParams } from 'react-router';
 import { $api, queryView, type QueryView } from '@/api/query';
 import type { components } from '@/api/schema';
-import { taskPagePath } from '@/lib/contest-paths';
 import { useContestParams } from '@/lib/route-params';
-import { entrantGradingsPath } from '@/lib/sections';
 import { BodyText } from '@/ui/BodyText';
 import { Page, PageHeader } from '@/ui/Page';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { LeaderboardTable } from '@/ui/leaderboards/table';
 import { BySession } from '../BySession';
-import { submissionHref } from '../submit/submission-param';
+import { countedSubmissionTo } from '../submit/submission-param';
 
 type Leaderboard = components['schemas']['Leaderboard'];
 
@@ -27,29 +24,18 @@ const POLL_MS = 30_000;
 export function LeaderboardsPage() {
   const { org, contest } = useContestParams();
   const { leaderboard } = useParams();
-  return (
-    <BySession
-      signedIn={
-        leaderboard === undefined ? (
-          <SignedInBoards org={org} contest={contest} />
-        ) : (
-          <OneBoard org={org} contest={contest} leaderboard={leaderboard} signedIn />
-        )
-      }
-      visitor={
-        leaderboard === undefined ? (
-          <PublicBoards org={org} contest={contest} />
-        ) : (
-          <OneBoard
-            org={org}
-            contest={contest}
-            leaderboard={leaderboard}
-            signedIn={false}
-          />
-        )
-      }
-    />
-  );
+  const boards = (signedIn: boolean) =>
+    leaderboard === undefined ? (
+      <AllBoards org={org} contest={contest} signedIn={signedIn} />
+    ) : (
+      <OneBoard
+        org={org}
+        contest={contest}
+        leaderboard={leaderboard}
+        signedIn={signedIn}
+      />
+    );
+  return <BySession signedIn={boards(true)} visitor={boards(false)} />;
 }
 
 function OneBoard({
@@ -81,25 +67,21 @@ function OneBoard({
   );
 }
 
-function SignedInBoards({ org, contest }: { org: string; contest: string }) {
+function AllBoards({
+  org,
+  contest,
+  signedIn,
+}: {
+  org: string;
+  contest: string;
+  signedIn: boolean;
+}) {
   const query = $api.useQuery(
     'get',
-    '/api/v1/orgs/{org}/contests/{contest}/leaderboards',
-    {
-      params: { path: { org, contest } },
-    },
-    { refetchInterval: POLL_MS },
-  );
-  return <Boards view={queryView(query)} org={org} contest={contest} />;
-}
-
-function PublicBoards({ org, contest }: { org: string; contest: string }) {
-  const query = $api.useQuery(
-    'get',
-    '/api/v1/public/contests/{org}/{contest}/leaderboards',
-    {
-      params: { path: { org, contest } },
-    },
+    signedIn
+      ? '/api/v1/orgs/{org}/contests/{contest}/leaderboards'
+      : '/api/v1/public/contests/{org}/{contest}/leaderboards',
+    { params: { path: { org, contest } } },
     { refetchInterval: POLL_MS },
   );
   return <Boards view={queryView(query)} org={org} contest={contest} />;
@@ -114,30 +96,24 @@ function Boards({
   org: string;
   contest: string;
 }) {
-  if (view.state === 'loading') return <PageSkeleton />;
-  if (view.state === 'error')
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
-  // Staff, as the server says on each board, open the entrant's submissions
-  // to the task; anyone else, who reads only their own row, their own
-  // submission.
-  const open = (staff: boolean) => (task: string, number: number, entrant: string) =>
-    staff
-      ? entrantGradingsPath(org, contest, task, entrant)
-      : `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
   return (
-    <Page>
-      <PageHeader title="Leaderboards" />
-      {view.data.length === 0 ? (
-        <BodyText tone="secondary">Nothing is on a leaderboard yet.</BodyText>
-      ) : (
-        view.data.map((board) => (
-          <LeaderboardTable
-            key={board.key}
-            board={board}
-            submissionTo={open(board.staff)}
-          />
-        ))
+    <Loaded view={view}>
+      {(boards) => (
+        <Page>
+          <PageHeader title="Leaderboards" />
+          {boards.length === 0 ? (
+            <BodyText tone="secondary">Nothing is on a leaderboard yet.</BodyText>
+          ) : (
+            boards.map((board) => (
+              <LeaderboardTable
+                key={board.key}
+                board={board}
+                submissionTo={countedSubmissionTo(org, contest, board.staff)}
+              />
+            ))
+          )}
+        </Page>
       )}
-    </Page>
+    </Loaded>
   );
 }

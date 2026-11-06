@@ -1,32 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
+import { byPlace, type At } from '@/api/place';
 import { $api, widenQuery } from '@/api/query';
 import type { Announcement } from '@/api/types';
 
 /** A contest or a task, the two places an announcement is posted at. */
-export type AnnouncementPlace =
-  | { kind: 'contest'; org: string; contest: string }
-  | { kind: 'task'; org: string; contest: string; task: string };
+export type AnnouncementPlace = At<'contest' | 'task'>;
 
 const CONTEST = '/api/v1/orgs/{org}/contests/{contest}/announcements';
 const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/announcements';
 
-/**
- * The organiser's announcement routes are the same four under a contest and
- * a task, so the section takes a place and these choose the address.
- */
 export function announcementsQuery(place: AnnouncementPlace) {
-  if (place.kind === 'contest') {
-    return widenQuery(
-      $api.queryOptions('get', CONTEST, {
-        params: { path: { org: place.org, contest: place.contest } },
-      }),
-    );
-  }
-  return widenQuery(
-    $api.queryOptions('get', TASK, {
-      params: { path: { org: place.org, contest: place.contest, task: place.task } },
-    }),
-  );
+  return byPlace(place, {
+    contest: (path) =>
+      widenQuery($api.queryOptions('get', CONTEST, { params: { path } })),
+    task: (path) => widenQuery($api.queryOptions('get', TASK, { params: { path } })),
+  });
 }
 
 export function useManagedAnnouncements(
@@ -40,7 +28,7 @@ type Text = { title: string; body: string };
 
 /**
  * Post, edit, close and reopen at the place. Every mutation exists on every render,
- * since hooks cannot be chosen between, and the place picks which one runs.
+ * since hooks cannot be chosen between.
  */
 export function useAnnouncementChanges(place: AnnouncementPlace) {
   const postContest = $api.useMutation('post', CONTEST);
@@ -52,32 +40,29 @@ export function useAnnouncementChanges(place: AnnouncementPlace) {
   const reopenContest = $api.useMutation('post', `${CONTEST}/{number}/reopen`);
   const reopenTask = $api.useMutation('post', `${TASK}/{number}/reopen`);
 
-  const contestPath = { org: place.org, contest: place.contest };
   const post = (body: Text): Promise<Announcement> =>
-    place.kind === 'contest'
-      ? postContest.mutateAsync({ params: { path: contestPath }, body })
-      : postTask.mutateAsync({
-          params: { path: { ...contestPath, task: place.task } },
-          body,
-        });
+    byPlace(place, {
+      contest: (path) => postContest.mutateAsync({ params: { path }, body }),
+      task: (path) => postTask.mutateAsync({ params: { path }, body }),
+    });
   const edit = (number: number, body: Text): Promise<Announcement> =>
-    place.kind === 'contest'
-      ? editContest.mutateAsync({ params: { path: { ...contestPath, number } }, body })
-      : editTask.mutateAsync({
-          params: { path: { ...contestPath, task: place.task, number } },
-          body,
-        });
+    byPlace(place, {
+      contest: (path) =>
+        editContest.mutateAsync({ params: { path: { ...path, number } }, body }),
+      task: (path) =>
+        editTask.mutateAsync({ params: { path: { ...path, number } }, body }),
+    });
   const close = (number: number): Promise<Announcement> =>
-    place.kind === 'contest'
-      ? closeContest.mutateAsync({ params: { path: { ...contestPath, number } } })
-      : closeTask.mutateAsync({
-          params: { path: { ...contestPath, task: place.task, number } },
-        });
+    byPlace(place, {
+      contest: (path) =>
+        closeContest.mutateAsync({ params: { path: { ...path, number } } }),
+      task: (path) => closeTask.mutateAsync({ params: { path: { ...path, number } } }),
+    });
   const reopen = (number: number): Promise<Announcement> =>
-    place.kind === 'contest'
-      ? reopenContest.mutateAsync({ params: { path: { ...contestPath, number } } })
-      : reopenTask.mutateAsync({
-          params: { path: { ...contestPath, task: place.task, number } },
-        });
+    byPlace(place, {
+      contest: (path) =>
+        reopenContest.mutateAsync({ params: { path: { ...path, number } } }),
+      task: (path) => reopenTask.mutateAsync({ params: { path: { ...path, number } } }),
+    });
   return { post, edit, close, reopen };
 }

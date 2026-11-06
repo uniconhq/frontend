@@ -1,9 +1,3 @@
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
 .stack {
   display: flex;
   flex-direction: column;
@@ -41,13 +35,6 @@
   background: var(--unicon-hover);
 }
 
-/* One part of what a save does: its label, then its lines. */
-.effectPart {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
 /* A field's box: what it holds one under the other, a form's gap apart. */
 .fieldBox > * + * {
   margin-top: 10px;
@@ -58,13 +45,6 @@
   flex-direction: column;
   gap: 10px;
   max-width: 420px;
-}
-
-.actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
 }
 
 .errorPath {

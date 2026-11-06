@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
 import { renderApp } from '@/test/render';
-import { server, signedIn, someone } from '@/test/server';
+import { server, signedIn, signedInAs } from '@/test/server';
 import { passTime, withFakeTimers } from '@/test/timers';
 
 const PAGE = '/contests/acme/spring/leaderboards';
@@ -46,7 +46,7 @@ const GRADEBOOK = {
 describe("a contest's leaderboards", () => {
   it('reads the signed-in list and opens a counted submission of the entrant’s own', async () => {
     server.use(
-      http.get('/api/v1/me', () => HttpResponse.json({ ...someone, roles: [] })),
+      ...signedInAs(null, { roles: [] }),
       http.get('/api/v1/orgs/:org/contests/:contest/leaderboards', () =>
         HttpResponse.json([GRADEBOOK]),
       ),

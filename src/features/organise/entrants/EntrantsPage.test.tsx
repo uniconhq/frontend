@@ -3,9 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { OrganisedEntrant } from '@/api/types';
-import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
+import { problem, server, signedIn, signedInAs } from '@/test/server';
 import { CONTEST_API, organisedEntrant } from '@/test/contestant';
 
 const PAGE = '/orgs/acme/contests/spring/entrants';
@@ -395,7 +394,7 @@ describe('the entrants page', () => {
   });
 
   it('shows an observer the list without actions', async () => {
-    server.use(signedIn, ...holding('observer'));
+    server.use(...signedInAs('observer'));
     entrantsWith([red]);
     renderApp(PAGE);
 

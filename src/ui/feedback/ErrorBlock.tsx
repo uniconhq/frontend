@@ -12,32 +12,30 @@ import { describeError } from '@/api/describe-error';
  * and their drafts. The code underneath is for a support message.
  *
  * `compact` is the heading and the sentence alone, for a menu or a dialog
- * that has no room for a code or a retry.
+ * that has no room for a code or a retry. `alert` announces it as it appears.
  */
 export function ErrorBlock({
   error,
   onRetry,
   compact = false,
+  alert = false,
   heading = 'Couldn’t load',
 }: {
   error: unknown;
   onRetry?: () => void;
   compact?: boolean;
+  alert?: boolean;
   heading?: string;
 }) {
   const apiError = toApiError(error);
   const { title, message } = describeError(apiError, heading);
 
-  if (compact) {
-    return (
-      <>
-        <BodyText tone="secondary">{title}</BodyText>
-        <BodyText tone="secondary">{message}</BodyText>
-      </>
-    );
-  }
-
-  return (
+  const block = compact ? (
+    <>
+      <BodyText tone="secondary">{title}</BodyText>
+      <BodyText tone="secondary">{message}</BodyText>
+    </>
+  ) : (
     <Stack gap="xs" align="flex-start" py="lg">
       <SectionTitle>{title}</SectionTitle>
       <BodyText>{message}</BodyText>
@@ -52,4 +50,5 @@ export function ErrorBlock({
       )}
     </Stack>
   );
+  return alert ? <div role="alert">{block}</div> : block;
 }

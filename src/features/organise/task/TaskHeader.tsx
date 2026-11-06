@@ -6,6 +6,7 @@ import { Button } from '@/ui/Button';
 import { Chip } from '@/ui/Chip';
 import { PageLink } from '@/ui/PageLink';
 import { Loaded } from '@/ui/feedback/Loaded';
+import { Group, Stack } from '@/ui/layout';
 import { taskCardPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
@@ -207,7 +208,7 @@ function NextStep({
     );
   }
   return (
-    <div className={classes.statusLine}>
+    <Group gap="6px 10px">
       <BodyText>
         {state.latest === null
           ? 'The task is saved and has no problems, but it is not published yet.'
@@ -224,7 +225,7 @@ function NextStep({
           Publish it
         </Button>
       )}
-    </div>
+    </Group>
   );
 }
 
@@ -260,9 +261,9 @@ export function TaskStanding({
   return (
     <Loaded view={state} rows={2}>
       {(task) => (
-        <div className={classes.status} aria-label="Where the task stands">
+        <Stack gap={6} aria-label="Where the task stands">
           <TaskInContest org={place.org} contest={place.contest} task={place.task} />
-          <div className={classes.statusLine}>
+          <Group gap="6px 10px">
             <StateChip state={task} />
             {last !== undefined && (
               <BodyText tone="secondary">
@@ -270,7 +271,7 @@ export function TaskStanding({
                 {last.author === null ? '' : ` by ${last.author}`}
               </BodyText>
             )}
-          </div>
+          </Group>
           {/* Only once both are read, so it never says what they lack meanwhile. */}
           {!form.isPending && !settings.isPending && (
             <Ready
@@ -318,7 +319,7 @@ export function TaskStanding({
             </ul>
           )}
           <NextStep place={place} state={task} saving={saving} manager={manager} />
-        </div>
+        </Stack>
       )}
     </Loaded>
   );

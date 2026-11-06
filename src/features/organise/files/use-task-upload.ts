@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiClient } from '@/api/client';
+import { byPlace } from '@/api/place';
 import { ApiError, toApiError } from '@/api/problem';
 import { hashOf } from '@/api/upload/door';
 import { abortPartUpload, uploadInParts } from '@/api/upload/parts';
@@ -25,29 +26,24 @@ export type UploadState =
  * yet: what a save writing that path presents.
  */
 export async function tokenNow(place: TaskPlace, path: string): Promise<string | null> {
-  if (place.kind === 'workflow') {
-    try {
-      const { data } = await apiClient.GET(
-        '/api/v1/workflows/{owner}/{name}/files/{path}',
-        {
-          params: { path: { owner: place.owner, name: place.name, path } },
-        },
-      );
-      return data?.token ?? null;
-    } catch (error) {
-      if (toApiError(error).code === 'not_found') return null;
-      throw error;
-    }
-  }
-  const task = { org: place.org, contest: place.contest, task: place.task };
   try {
     // Read past the query cache, so a file open in the editor keeps the text
     // and the token it was read with.
-    const { data } = await apiClient.GET(
-      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/files/{path}',
-      { params: { path: { ...task, path } } },
-    );
-    return data?.token ?? null;
+    return await byPlace(place, {
+      workflow: async (at) =>
+        (
+          await apiClient.GET('/api/v1/workflows/{owner}/{name}/files/{path}', {
+            params: { path: { ...at, path } },
+          })
+        ).data?.token ?? null,
+      task: async (at) =>
+        (
+          await apiClient.GET(
+            '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/files/{path}',
+            { params: { path: { ...at, path } } },
+          )
+        ).data?.token ?? null,
+    });
   } catch (error) {
     if (toApiError(error).code === 'not_found') return null;
     throw error;

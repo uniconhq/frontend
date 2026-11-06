@@ -1,3 +1,4 @@
+import type { At } from '@/api/place';
 import type { RoleName } from '@/api/types';
 
 /** Each role's name, as a page shows it. */
@@ -43,7 +44,4 @@ export function roleMeans(role: RoleName, kind: RolePlace['kind']): readonly str
 }
 
 /** An org, a contest or a task, the three places a role is held at. */
-export type RolePlace =
-  | { kind: 'org'; org: string }
-  | { kind: 'contest'; org: string; contest: string }
-  | { kind: 'task'; org: string; contest: string; task: string };
+export type RolePlace = At<'org' | 'contest' | 'task'>;

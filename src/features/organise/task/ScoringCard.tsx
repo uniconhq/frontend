@@ -71,7 +71,9 @@ import { ShowPicker, type ShowRow } from './ShowPicker';
 import { ShowPreview } from './ShowPreview';
 import { useDraftRuns } from './draft-runs';
 import { FIRST_NOT_PASSED } from '@/ui/scored/scored-text';
+import { Group } from '@/ui/layout';
 import { isUnder } from '../problem-path';
+import tableClasses from '@/ui/table.module.css';
 import classes from './task.module.css';
 
 const SCORING: Shape = { width: 160, gap: 40 };
@@ -308,7 +310,7 @@ export function ScoringCard({
             No runs yet, so a submission gives nothing until the runs have a row.
           </BodyText>
         ) : (
-          <div className={classes.runTableFrame}>
+          <div className={tableClasses.scroll}>
             <table className={classes.runs} aria-label="What one submission gives">
               <thead>
                 <tr>
@@ -452,7 +454,7 @@ export function ScoringCard({
                   ? reading.kind
                   : 'to fix';
           const head = (
-            <div className={classes.valueHead}>
+            <Group gap={8} align="end">
               <FieldBox name={`value-${value.name}`}>
                 <TextInput
                   label="Name"
@@ -516,7 +518,7 @@ export function ScoringCard({
                   }
                 />
               )}
-            </div>
+            </Group>
           );
           return (
             <div

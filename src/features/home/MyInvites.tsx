@@ -8,6 +8,7 @@ import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { Group } from '@/ui/layout';
 import { contestHomePath } from '@/lib/contest-paths';
 import { contestPath, orgPath, taskPath } from '@/lib/organiser-paths';
 import { scopeName } from '@/lib/scope-name';
@@ -180,7 +181,7 @@ export function InviteCard({
         />
       )}
       {open && (
-        <div className={classes.actions}>
+        <Group gap={6} align="stretch">
           <Button
             size="xs"
             label={`Accept: ${name}`}
@@ -200,12 +201,10 @@ export function InviteCard({
           >
             Decline
           </Button>
-        </div>
+        </Group>
       )}
       {error !== null && (
-        <div role="alert">
-          <ErrorBlock error={error} compact heading="Couldn’t answer the invite" />
-        </div>
+        <ErrorBlock error={error} compact alert heading="Couldn’t answer the invite" />
       )}
     </li>
   );

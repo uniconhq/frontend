@@ -4,12 +4,13 @@ import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { useFallbackPoll } from '@/live';
 import { announcementAnchor } from '@/ui/threads/anchors';
 import { AnnouncementContent } from '@/ui/threads/ThreadParts';
 import { itemClass } from '@/ui/threads/item-class';
 import classes from '@/ui/threads/threads.module.css';
+import { Stack } from '@/ui/layout';
 
 /** One announcement as anyone reads it, as an item of a list. */
 function AnnouncementItem({
@@ -76,12 +77,12 @@ export function ContestAnnouncements({
     ),
   );
   return (
-    <div className={classes.stack}>
+    <Stack gap="sm">
       <SectionTitle>Announcements</SectionTitle>
-      {view.state === 'loading' && <PageSkeleton rows={2} />}
-      {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
-      {view.state === 'ready' && <Listed announcements={view.data} showPlace />}
-    </div>
+      <Loaded view={view} rows={2}>
+        {(announcements) => <Listed announcements={announcements} showPlace />}
+      </Loaded>
+    </Stack>
   );
 }
 
@@ -110,7 +111,7 @@ export function TaskAnnouncements({
   if (view.state === 'ready' && view.data.length === 0) return null;
   return (
     <Card>
-      <div className={classes.stack}>
+      <Stack gap="sm">
         <SectionTitle>Announcements</SectionTitle>
         {view.state === 'error' && (
           <ErrorBlock error={view.error} onRetry={view.retry} />
@@ -118,7 +119,7 @@ export function TaskAnnouncements({
         {view.state === 'ready' && (
           <Listed announcements={view.data} showPlace={false} />
         )}
-      </div>
+      </Stack>
     </Card>
   );
 }
