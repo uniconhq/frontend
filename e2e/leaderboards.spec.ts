@@ -266,6 +266,7 @@ test('a column’s flow shows its task and its picked column, and its tray uses 
       graded: false,
       yanked: null,
       text_values: [],
+      limits: { max: 50, count: 1, per: 30 },
     } satisfies Schemas['WorkflowForm']),
   );
   await page.goto('/orgs/acme/contests/spring/leaderboards');
@@ -278,9 +279,8 @@ test('a column’s flow shows its task and its picked column, and its tray uses 
     card.getByRole('img', { name: 'sum_pick column', exact: true }),
   ).toBeVisible();
   await expect(
-    card.getByText('Click a tile to put it in total, at the cursor.', { exact: true }),
+    card.getByRole('heading', { name: 'Many into one', exact: true }),
   ).toBeVisible();
-  await expect(card.getByText(/put it in column-/)).toHaveCount(0);
   await expect(
     card.getByRole('button', { name: 'public.summary text', exact: true }),
   ).toBeVisible();
@@ -313,8 +313,6 @@ test('an added column opens its formula with its visible name', async ({ page })
     card.getByRole('textbox', { name: 'column_2', exact: true }),
   ).toBeFocused();
   await expect(
-    card.getByText('Click a tile to put it in column_2, at the cursor.', {
-      exact: true,
-    }),
+    card.getByRole('heading', { name: 'Many into one', exact: true }),
   ).toBeVisible();
 });

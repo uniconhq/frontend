@@ -27,7 +27,6 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from '@codemirror/view';
-import { BodyText } from '@/ui/BodyText';
 import { Stack } from '@/ui/layout';
 import type { Catalogue } from './catalogue';
 import {
@@ -46,6 +45,7 @@ import type { FlowAbout } from './flow';
 import { TileCard } from './TileCard';
 import { columnOf, inputWords, kindWords, shapeOf } from './shapes';
 import { exampleFor } from './examples';
+import { BlockWords, Slot } from './BlockWords';
 import classes from './formula.module.css';
 
 const SYMBOL: Record<string, string> = {
@@ -153,8 +153,8 @@ function completionsFor(
       return {
         label: block.name,
         displayLabel: `${block.name}(…)`,
-        detail: block.words,
-        info: block.words,
+        detail: block.words.replaceAll('`', ''),
+        info: block.words.replaceAll('`', ''),
         section: SECTIONS.block,
         apply: (view, _completion, from, to) => {
           view.dispatch({
@@ -581,7 +581,7 @@ export function FormulaLine({
           <span className={classes.formulaSign}>
             {signature(context.call.block, context.call.input, call)}
           </span>{' '}
-          {words}
+          {words !== undefined && <BlockWords words={words} />}
         </div>
       ) : (
         reading.node !== null &&
@@ -712,18 +712,19 @@ export function FormulaTiles({
       insert: insertFor(block.name),
       details: (
         <>
-          <p>{block.words}</p>
+          <p>
+            <BlockWords words={block.words} />
+          </p>
           {block.forms.map((form, index) => (
             <div key={index} className={classes.tileForm}>
               {index > 0 && <div>or</div>}
               <dl>
                 <dt>Takes</dt>
                 <dd>
-                  {form.given}
                   <ul>
                     {Object.entries(form.inputs).map(([name, input]) => (
                       <li key={name}>
-                        {name}
+                        <Slot name={name} />
                         {input.optional ? ' (optional)' : ''}:{' '}
                         {inputWords(input, scope.where)}
                       </li>
@@ -769,11 +770,6 @@ export function FormulaTiles({
   const programs = inColumn('program');
   return (
     <Stack gap={8}>
-      <BodyText size="sm" tone="secondary">
-        {target === null
-          ? 'Click in a formula, then click a tile to put it at the cursor. Or just type: what fits pops up as you go.'
-          : `Click a tile to put it in ${target}, at the cursor.`}
-      </BodyText>
       <div className={classes.trayRow}>
         <Group title="Start from">
           <Tiles tiles={named(scope.sets, 'set')} onInsert={onInsert} />

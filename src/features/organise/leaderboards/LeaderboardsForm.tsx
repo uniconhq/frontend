@@ -31,6 +31,7 @@ import { textOf } from '../forms/values';
 import { usePlaceMay } from '../may';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { Group } from '@/ui/layout';
+import { ShownField } from '@/ui/ShownField';
 import { CardPart } from '../task/BuildCard';
 import shared from '../organise.module.css';
 import { isUnder, type ProblemPath } from '../problem-path';
@@ -237,13 +238,6 @@ function dropColumn(board: BoardDraft, columnKey: string): BoardDraft {
     display:
       name === '' ? board.display : board.display.filter((item) => item.name !== name),
   };
-}
-
-/** What a leaderboard's card is headed with: its name, or its key until it has one. */
-function boardTitle(board: BoardDraft): string {
-  const title = board.title.trim();
-  if (title !== '') return title;
-  return board.key === '' ? 'New leaderboard' : board.key;
 }
 
 function setWho(board: BoardDraft, who: Who): BoardDraft {
@@ -526,15 +520,7 @@ function BoardCard({
     >
       <Card>
         <div className={shared.stack}>
-          <Group gap="md" align="flex-start" justify="space-between">
-            <SectionTitle>{boardTitle(board)}</SectionTitle>
-            {!disabled && (
-              <Button variant="secondary" disabled={disabled} onClick={onRemove}>
-                Remove leaderboard
-              </Button>
-            )}
-          </Group>
-          <div>
+          <Group gap="md" align="flex-end" justify="space-between">
             <FieldBox name={`${board.key}.key`}>
               <FieldBox name={`${board.key}.title`}>
                 <TextInput
@@ -560,10 +546,18 @@ function BoardCard({
                 />
               </FieldBox>
             </FieldBox>
-            <BodyText size="sm" tone="secondary">
-              Its link and its name in other leaderboards' formulas: {board.key}
-            </BodyText>
-          </div>
+            {!disabled && (
+              <Button variant="secondary" disabled={disabled} onClick={onRemove}>
+                Remove leaderboard
+              </Button>
+            )}
+          </Group>
+          <ShownField
+            label="Key"
+            description="Its link, and how other leaderboards' formulas name it."
+          >
+            <code className={classes.key}>{board.key}</code>
+          </ShownField>
           <div className={classes.audience}>
             <FieldBox name={`${board.key}.audience.who`}>
               <RadioGroup
@@ -702,7 +696,7 @@ function BoardCard({
           </CardPart>
           <CardPart
             title="Ranking"
-            line="Each one after the first breaks the ties the ones before it leave."
+            line="Rows are ordered by the first; when two rows tie on it, the next decides, and so on."
           >
             <FieldBox name={`${board.key}.sort`}>
               <FieldMessages messages={at(`${board.key}.sort`)} />
@@ -999,7 +993,7 @@ function DisplayRow({
             value={item.decimals}
             inputMode="decimal"
             disabled={disabled}
-            placeholder="As given"
+            placeholder="Up to 4"
             onChange={(decimals) => onChange({ ...item, decimals })}
           />
           <span>decimals</span>
@@ -1154,11 +1148,8 @@ function HoldFields({
         <div className={shared.stack}>
           <SectionTitle>Freeze</SectionTitle>
           <BodyText tone="secondary">
-            Keep the final results a surprise. From a time you pick, people stop seeing
-            each other's new results: every leaderboard stays as it was, with a note
-            like "3 held" for what came in since. Entrants still see their own results,
-            and organisers see everything. When the freeze ends, everything held back
-            shows up at once.
+            From the time you pick, leaderboards stop changing for entrants. They still
+            see their own results. Everything held back shows when the freeze ends.
           </BodyText>
           {locked && (
             <BodyText>The freeze cannot be read. Set it again to replace it.</BodyText>

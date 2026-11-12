@@ -2,7 +2,6 @@ import { type Catalogue } from './catalogue';
 import { describeFormula, readLine, type FormulaScope } from './parse';
 
 type Example = { formula: string; words: string };
-type Starter = Example & { name: string };
 
 function checked(
   formula: string | undefined,
@@ -81,50 +80,4 @@ export function exampleFor(
     // A program example needs a real folder; the scope does not promise one.
   };
   return checked(templates[block.name], scope, catalogue);
-}
-
-export function startersFor(scope: FormulaScope, catalogue: Catalogue): Starter[] {
-  const task = scope.sets[0];
-  const pick = scope.names.find(
-    (name) => name === `${task}_pick` && scope.picks?.includes(name),
-  );
-  const templates: [string, string | undefined][] =
-    scope.where === 'task'
-      ? [
-          [
-            'Total score',
-            scope.each.includes('all.score') ? 'sum(all.score)' : undefined,
-          ],
-          [
-            'Runs passed',
-            scope.each.includes('all.passed')
-              ? 'count(all, all.passed == 1)'
-              : undefined,
-          ],
-          [
-            'Fastest time',
-            scope.each.includes('all.time_ms') ? 'min(all.time_ms)' : undefined,
-          ],
-        ]
-      : [
-          [
-            'Best submission',
-            task === undefined || !scope.each.includes(`${task}.points`)
-              ? undefined
-              : `highest(${task}, by: ${task}.points)`,
-          ],
-          ['Points', pick === undefined ? undefined : `otherwise(${pick}.points, 0)`],
-          [
-            'Penalty',
-            pick === undefined
-              ? undefined
-              : `if(${pick}, floor(${pick}.seconds / 60) + 20 * (${pick}.attempt - 1), 0)`,
-          ],
-        ];
-  return templates
-    .flatMap(([name, formula]) => {
-      const example = checked(formula, scope, catalogue);
-      return example === null ? [] : [{ name, ...example }];
-    })
-    .slice(0, 3);
 }

@@ -31,7 +31,9 @@ export function inputWords(input: Input, where: FormulaScope['where']): string {
     input.least === null
       ? ''
       : ` (at least ${String(input.least)}${input.most === null ? '' : `, at most ${String(input.most)}`})`;
-  return `${kindWords(input.kind)}${input.per_run ? (where === 'task' ? ' for each run' : ' for each submission') : ''}${input.plain ? ', written out' : ''}${limits}`;
+  // A task has no submissions, so there a test is a number.
+  const kind = where === 'task' && input.kind === 'either' ? 'number' : input.kind;
+  return `${kindWords(kind)}${input.per_run ? (where === 'task' ? ' for each run' : ' for each submission') : ''}${input.plain ? ', written out' : ''}${limits}`;
 }
 
 function shortShape(form: Form): string {

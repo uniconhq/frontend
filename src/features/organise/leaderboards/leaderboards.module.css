@@ -30,3 +30,9 @@
 .gap {
   flex: 1;
 }
+
+.key {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+}

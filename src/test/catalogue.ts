@@ -111,7 +111,8 @@ export function specCatalogue(): Catalogue {
     numberBlock('not', '1 when its input is 0, else 0', one),
     {
       name: 'if',
-      words: 'then when test is not 0, else else, reading only the branch it takes',
+      words:
+        '`then` when `test` is not 0, else `else`, reading only the branch it takes',
       forms: [
         {
           given: 'numbers',
@@ -149,12 +150,12 @@ export function specCatalogue(): Catalogue {
       false,
       true,
     ),
-    pickBlock('latest', 'the newest result that where keeps', false, false),
+    pickBlock('latest', 'the newest result that `where` keeps', false, false),
     pickBlock('highest', 'the run or result with the highest by', true, true),
     pickBlock('lowest', 'the run or result with the lowest by', true, true),
     {
       name: 'last',
-      words: "the last of a group's runs that where keeps",
+      words: "the last of a group's runs that `where` keeps",
       forms: [taskPick(false)],
     },
     {
@@ -194,7 +195,7 @@ export function specCatalogue(): Catalogue {
     },
     {
       name: 'sum_best',
-      words: 'the sum of the k largest of its inputs',
+      words: 'the sum of the `k` largest of its inputs',
       forms: [
         {
           given: 'numbers',

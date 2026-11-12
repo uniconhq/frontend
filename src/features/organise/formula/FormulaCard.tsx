@@ -7,8 +7,6 @@ import { FormulaLine, FormulaTiles } from './Editor';
 import { flowOf, type FlowAbout } from './flow';
 import { readLine } from './parse';
 import { useFormulaTarget } from './target';
-import { startersFor } from './examples';
-import { Button } from '@/ui/Button';
 import classes from './formula.module.css';
 
 /** One formula, its controls, its tiles while written, and what it reads. */
@@ -33,10 +31,6 @@ export function FormulaCard({
     }),
     [line.scope, name],
   );
-  const starters =
-    line.value.trim() === '' && !line.disabled
-      ? startersFor(scope, line.catalogue)
-      : [];
   const reading = useMemo(
     () => readLine(line.value, scope, line.catalogue),
     [line.value, scope, line.catalogue],
@@ -70,23 +64,6 @@ export function FormulaCard({
               line.onFocusLine?.(insert);
             }}
           />
-          {starters.length > 0 && (
-            <div className={classes.starters}>
-              {starters.map((starter) => (
-                <Button
-                  key={starter.name}
-                  variant="secondary"
-                  label={`${starter.name} ${starter.formula}`}
-                  onClick={() => line.onChange(starter.formula)}
-                >
-                  <span>
-                    {starter.name}
-                    <code>{starter.formula}</code>
-                  </span>
-                </Button>
-              ))}
-            </div>
-          )}
           {focused && !line.disabled && (
             <FormulaTiles
               scope={scope}

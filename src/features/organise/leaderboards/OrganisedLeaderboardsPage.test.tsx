@@ -230,7 +230,7 @@ describe("a contest's leaderboards for its organisers", () => {
     ).toBeVisible();
   });
 
-  it('heads each card with its leaderboard’s name and each part with its own heading', async () => {
+  it('shows each card’s key apart from its name, and heads each part', async () => {
     server.use(
       withBoards([
         ...STANDINGS,
@@ -242,11 +242,10 @@ describe("a contest's leaderboards for its organisers", () => {
       name: 'Leaderboard standings',
     });
     expect(
-      within(standings).getByRole('heading', { level: 2, name: 'Standings' }),
+      within(standings).getByText('standings', { selector: 'code' }),
     ).toBeVisible();
-    // A leaderboard with no name is headed with its key.
     const icpc = screen.getByRole('region', { name: 'Leaderboard icpc' });
-    expect(within(icpc).getByRole('heading', { level: 2, name: 'icpc' })).toBeVisible();
+    expect(within(icpc).getByText('icpc', { selector: 'code' })).toBeVisible();
     for (const part of ['Columns', 'Ranking', 'Shown on the leaderboard']) {
       expect(
         within(standings).getByRole('heading', { level: 3, name: part }),
@@ -254,12 +253,6 @@ describe("a contest's leaderboards for its organisers", () => {
     }
     const ranking = within(standings).getByRole('region', { name: 'Ranking' });
     expect(within(ranking).getByRole('button', { name: 'Rank by' })).toBeVisible();
-    const name = within(standings).getAllByRole('textbox', { name: 'Name' })[0]!;
-    await userEvent.clear(name);
-    await userEvent.type(name, 'Final results');
-    expect(
-      within(standings).getByRole('heading', { level: 2, name: 'Final results' }),
-    ).toBeVisible();
   });
 
   it('says why the rows are held under the question, while organisers alone see it', async () => {
@@ -285,7 +278,7 @@ describe("a contest's leaderboards for its organisers", () => {
     const name = within(card).getAllByRole('textbox', { name: 'Name' })[0]!;
     await userEvent.clear(name);
     await userEvent.type(name, 'Final results');
-    expect(within(card).getByText(/formulas: standings/)).toBeVisible();
+    expect(within(card).getByText('standings', { selector: 'code' })).toBeVisible();
     expect(
       screen.queryByRole('region', { name: 'Leaderboard final_results' }),
     ).toBeNull();
