@@ -148,13 +148,7 @@ describe('the layout', () => {
     expect(run.left).toEqual([
       'source',
       'language',
-      'entry',
       'stdin',
-      'files',
-      'loads',
-      'manifest',
-      'self_reported',
-      'args',
       'time_limit',
       'memory_limit',
     ]);
@@ -173,8 +167,8 @@ describe('the layout', () => {
     expect(drawn).toHaveLength(9);
     expect([...drawn].sort((a, b) => a - b)).toEqual(drawn);
     expect(new Set(drawn).size).toBe(drawn.length);
-    expect(run.height).toBeGreaterThan(19 * 28);
-    expect(rowOf(run, 'right', 'output')).toBe(11);
+    expect(run.height).toBeGreaterThan(13 * 28);
+    expect(rowOf(run, 'right', 'output')).toBe(5);
   });
 
   it('puts classic@v4 in columns by what each step reads, each input a box in the first', () => {
@@ -221,9 +215,11 @@ outputs:
 
     for (const step of [solution, compare]) {
       expect(step.left).toContain('source');
-      expect(step.left).toContain('files');
       expect(step.right).toContain('output');
     }
+    // An optional input is drawn once it is given.
+    expect(solution.left).not.toContain('files');
+    expect(compare.left).toContain('files');
     expect(columnOf(layout, 'step:1')).toBeGreaterThan(columnOf(layout, 'step:0') ?? 0);
     expect(wire('step:0.output', 'step:1.files')).toBeDefined();
     expect(wire('input:answer.answer', 'step:1.files')).toBeDefined();
@@ -407,7 +403,7 @@ outputs:
     expect(boxAt(open, 'step:0')).toMatchObject({
       open: true,
       width: BOX.open,
-      height: frame + BOX.head + 19 * GEOMETRY.row + GEOMETRY.foot,
+      height: frame + BOX.head + 13 * GEOMETRY.row + GEOMETRY.foot,
     });
     // An input says what it is in its head alone.
     expect(boxAt(closed, 'input:answer').height).toBe(frame + BOX.head);
@@ -429,7 +425,12 @@ steps:
   - {id: run, use: unicon/exec@v4, with: {source: "\${{ steps.inner.out }}"}}
 `;
     const workflow = readWorkflow(valuesOf(text));
-    const given = new Map([['kenny/inner@v1', { inputs: ['a'], outputs: ['out'] }]]);
+    const given = new Map([
+      [
+        'kenny/inner@v1',
+        { inputs: [{ name: 'a', optional: false }], outputs: ['out'] },
+      ],
+    ]);
     const layout = layoutWorkflow(workflow, primitives, given, {
       open: new Set(),
       warned: new Set(['step:1']),

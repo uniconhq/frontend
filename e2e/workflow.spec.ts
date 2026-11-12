@@ -442,7 +442,7 @@ test('a version’s box opens in the editor’s drawer, clear of the box, with e
 
   const drawer = page.getByRole('complementary', { name: 'Step check' });
   await expect(drawer).toBeVisible();
-  await expect(drawer.getByRole('textbox', { name: 'Name' })).toBeDisabled();
+  await expect(drawer.getByRole('textbox', { name: 'Key' })).toBeDisabled();
   await expect(drawer.getByRole('button', { name: /^Remove/ })).toHaveCount(0);
   await expect(async () => {
     const ofBox = await check.boundingBox();
@@ -480,10 +480,22 @@ test('every wire meets a handle of its boxes, open, closed and with a problem li
   }
 });
 
+/** The draft with run's optional args given, so its port is drawn. */
+async function stubGivenArgs(page: Page) {
+  await serveDraft(
+    page,
+    CLASSIC.replace(
+      '      stdin: ${{ inputs.input }}\n',
+      '      stdin: ${{ inputs.input }}\n      args: x\n',
+    ),
+  );
+}
+
 test('a wire dragged onto a port edits the file, and a refused one says why', async ({
   page,
 }) => {
   await stubWorkflowApi(page);
+  await stubGivenArgs(page);
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto('/workflows/kenny/tuned');
   await expect(page.getByRole('group', { name: 'Step run' })).toBeVisible();
@@ -706,6 +718,7 @@ test('a lifted wire moves to the port it is dropped on, or clears its port on no
   page,
 }) => {
   await stubWorkflowApi(page);
+  await stubGivenArgs(page);
   await page.setViewportSize({ width: 1600, height: 1400 });
   await page.goto('/workflows/kenny/tuned');
   const run = page.getByRole('group', { name: 'Step run' });
@@ -880,7 +893,7 @@ test('the frame shades an edge with more of the graph past it, and a selected bo
   await expect.poll(slid).toBe(0);
   const name = page
     .getByRole('complementary', { name: 'Step check' })
-    .getByRole('textbox', { name: 'Name' });
+    .getByRole('textbox', { name: 'Key' });
   await name.fill('verdict');
   await name.press('Enter');
   await expect(page.getByRole('group', { name: 'Step verdict' })).toBeVisible();

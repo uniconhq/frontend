@@ -20,11 +20,10 @@ export function DescriptionField({
   }
   return (
     <Textarea
-      label="What it does"
+      label="Description"
       value={text}
       onChange={setText}
       rows={2}
-      description="Shown above its graph wherever it is shown, so others can tell what it is for."
       placeholder="Runs the solution on the test's input and compares its output with the answer."
       onCommit={() => {
         if (text.trim() !== said) apply(text);

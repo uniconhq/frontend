@@ -119,7 +119,10 @@ export function portsOf(boxes: ReadonlyMap<string, BoxDecl>): Map<string, StepPo
   const found = new Map<string, StepPorts>();
   for (const [use, box] of boxes)
     found.set(use, {
-      inputs: box.inputs.map((input) => input.name),
+      inputs: box.inputs.map((input) => ({
+        name: input.name,
+        optional: input.optional,
+      })),
       outputs: box.outputs.map((output) => output.name),
     });
   return found;

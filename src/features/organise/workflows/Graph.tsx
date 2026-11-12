@@ -253,7 +253,10 @@ function fedBy(
   const value =
     box.step === null ? undefined : seen.workflow.steps[box.step]?.with[port];
   if (value === undefined) return 'nothing yet';
-  return value.kind === 'wire' ? refWords(value.ref) : null;
+  // An input or file not drawn has its pill beside the port.
+  return value.kind === 'wire' && seen.unboxed(value.ref) === null
+    ? refWords(value.ref)
+    : null;
 }
 
 function rowView(
@@ -762,6 +765,36 @@ function FedTab({ fed, box }: { fed: Fed[]; box: string }) {
   );
 }
 
+/**
+ * An open box's inputs and files that are not drawn: a pill beside each
+ * port they feed, named as the input or file, which selects it.
+ */
+function FedPills({ fed, rows }: { fed: Fed[]; rows: RowView[] }) {
+  const actions = useActions();
+  return rows.flatMap((row) => {
+    const feeding = fed.filter((each) => each.ports.includes(row.port));
+    const first = feeding[0];
+    if (row.side !== 'left' || first === undefined) return [];
+    const names = feeding.map((each) => each.head.title).join(', ');
+    return [
+      <button
+        key={row.port}
+        type="button"
+        className={`${classes.fedTab} ${classes.fedPill} nodrag nopan`}
+        style={{
+          top: row.top + GEOMETRY.row / 2,
+          background:
+            first.kind === 'input' ? WORKFLOW_PALETTE.input : WORKFLOW_PALETTE.file,
+        }}
+        aria-label={`${names}, read by ${row.port}`}
+        onClick={() => actions.select(first.key)}
+      >
+        {names}
+      </button>,
+    ];
+  });
+}
+
 const BoxView = memo(function BoxView({ data }: NodeProps<BoxNode>) {
   const actions = useActions();
   const { head } = data;
@@ -799,7 +832,12 @@ const BoxView = memo(function BoxView({ data }: NodeProps<BoxNode>) {
         aria-label={data.name}
       >
         <Head box={data.key} head={head} open={data.open} />
-        {data.fed.length > 0 && <FedTab fed={data.fed} box={data.name} />}
+        {data.fed.length > 0 &&
+          (data.open ? (
+            <FedPills fed={data.fed} rows={data.rows} />
+          ) : (
+            <FedTab fed={data.fed} box={data.name} />
+          ))}
         {data.warning !== null && (
           <WarningLine warning={data.warning} rows={data.rows} />
         )}

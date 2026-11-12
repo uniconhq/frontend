@@ -85,7 +85,6 @@ describe('the workflow editor', () => {
       await add('Inputs', 'Text', 'Inputs');
       await add('Workflows', 'kenny/inner@v1', 'Step inner');
       await wireFrom('source', 'exec', /^submission from the inputs/);
-      await wireFrom('stdin', 'exec', /^input from the inputs/);
       await wireFrom('time_limit', 'exec', /^time_limit from the inputs/);
       await wireFrom('memory_limit', 'exec', /^memory_limit from the inputs/);
       await wireFrom('actual', 'diff-check', /^output from exec/);
@@ -99,7 +98,6 @@ describe('the workflow editor', () => {
           use: 'unicon/exec@v4',
           with: {
             source: '${{ inputs.submission }}',
-            stdin: '${{ inputs.input }}',
             time_limit: '${{ inputs.time_limit }}',
             memory_limit: '${{ inputs.memory_limit }}',
           },

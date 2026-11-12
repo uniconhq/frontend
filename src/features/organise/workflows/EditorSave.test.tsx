@@ -300,10 +300,10 @@ describe('saving and publishing a workflow', () => {
   it('saves nothing over someone else’s save, and reloads the draft they saved', async () => {
     const { user, backend } = openEditor();
 
-    await user.click(await portButton(user, 'run', 'args'));
+    await user.click(await portButton(user, 'run', 'stdin'));
     await user.click(
-      within(await openMenu('The port args of run')).getByRole('menuitem', {
-        name: /^time_limit from the inputs/,
+      within(await openMenu('The port stdin of run')).getByRole('menuitem', {
+        name: /^answer from the inputs/,
       }),
     );
     backend.state.values = theirs();
@@ -322,10 +322,10 @@ describe('saving and publishing a workflow', () => {
     await waitFor(() => expect(barButton('Save')).toBeDisabled());
     expect(screen.queryByRole('alert')).toBeNull();
     expect(toolButton('Undo')).toBeDisabled();
-    await user.click(await portButton(user, 'run', 'args'));
+    await user.click(await portButton(user, 'run', 'stdin'));
     await user.click(
-      within(await openMenu('The port args of run')).getByRole('menuitem', {
-        name: /^time_limit from the inputs/,
+      within(await openMenu('The port stdin of run')).getByRole('menuitem', {
+        name: /^answer from the inputs/,
       }),
     );
     const saved = await savedValues(user);
@@ -341,11 +341,11 @@ describe('saving and publishing a workflow', () => {
     try {
       const { user, backend } = openEditor();
 
-      await user.click(await portButton(user, 'run', 'args'));
+      await user.click(await portButton(user, 'run', 'stdin'));
       openStream();
       await user.click(
-        within(await openMenu('The port args of run')).getByRole('menuitem', {
-          name: /^time_limit from the inputs/,
+        within(await openMenu('The port stdin of run')).getByRole('menuitem', {
+          name: /^answer from the inputs/,
         }),
       );
       backend.state.values = theirs();
@@ -362,8 +362,8 @@ describe('saving and publishing a workflow', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent(
         'The workflow kenny/tuned has changed since you opened it.',
       );
-      expect(runOf(backend.state.saves[0]?.values ?? null).args).toBe(
-        '${{ inputs.time_limit }}',
+      expect(runOf(backend.state.saves[0]?.values ?? null).stdin).toBe(
+        '${{ inputs.answer }}',
       );
       expect(backend.state.saves).toEqual([
         expect.objectContaining({ token: 'token-1' }),

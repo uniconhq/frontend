@@ -87,7 +87,8 @@ describe('a workflow drawn', () => {
     expect(row('source')).toHaveTextContent('runs this as a program');
     expect(row('time_limit')).toHaveTextContent('sets the time limit');
     expect(row('memory_limit')).toHaveTextContent('sets the memory limit');
-    expect(row('args')).toHaveTextContent('(optional)');
+    expect(row('stdin')).toHaveTextContent('(optional)');
+    expect(within(run).queryByText('args')).toBeNull();
     expect(run).not.toHaveTextContent(/outcome|secret|batch|raises a limit/);
     const inputs = screen.getByRole('group', { name: 'Input submission' });
     expect(inputs).not.toHaveTextContent('the entrant gives it');

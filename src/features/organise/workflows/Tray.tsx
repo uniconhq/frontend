@@ -17,15 +17,6 @@ import { versionNumber } from './versions';
 import { needsWords, primitiveTitle, typeWords, visibilityWords } from './words';
 import classes from './workflows.module.css';
 
-const INPUT_LINES: Record<ValueType, string> = {
-  text: 'A line of text, such as a language name',
-  number: 'A number, such as a time limit in seconds',
-  boolean: 'A switch, such as whether to lint',
-  enum: 'One of a list, such as c, cpp or python',
-  file: 'One file, such as a test’s input',
-  folder: 'A folder of files, such as the entrant’s code',
-};
-
 /** The newest with no problem, in the platform's order. An older version is chosen in the step's drawer. */
 function newest(primitives: PrimitiveInfo[]): PrimitiveInfo[] {
   const found = new Map<string, PrimitiveInfo>();
@@ -53,13 +44,13 @@ function TrayGroup({ title, children }: { title: string; children: ReactNode }) 
 function TrayButton({
   name,
   label = name,
-  line,
+  line = '',
   note,
   onAdd,
 }: {
   name: string;
   label?: string;
-  line: string;
+  line?: string;
   note?: string;
   onAdd: () => void;
 }) {
@@ -116,12 +107,7 @@ export function Tray({
       <div className={classes.trayRow}>
         <TrayGroup title="Inputs">
           {VALUE_TYPES.map((type) => (
-            <TrayButton
-              key={type}
-              name={typeWords(type)}
-              line={INPUT_LINES[type]}
-              onAdd={() => onInput(type)}
-            />
+            <TrayButton key={type} name={typeWords(type)} onAdd={() => onInput(type)} />
           ))}
         </TrayGroup>
         <TrayGroup title="Primitives">

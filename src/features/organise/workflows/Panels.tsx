@@ -530,9 +530,8 @@ export function StepPanel({
   return (
     <section className={classes.panel} aria-label={`The step ${step.id}`}>
       <CommitField
-        label="Name"
+        label="Key"
         value={step.id}
-        description="Other steps read its outputs by this name. Renaming it changes them too."
         apply={(id) => {
           if (workflow.steps.some((other, at) => at !== index && other.id === id))
             return TAKEN;
@@ -766,14 +765,22 @@ function InputRow({
   return (
     <li className={classes.declaration} aria-label={`The input ${input.id}`}>
       <CommitField
-        label="Name"
+        label="Key"
         value={input.id}
-        description="Steps read it by this name. Renaming it changes them too."
         apply={(id) => {
           if (sharedNames(workflow).some((other) => other !== input.id && other === id))
             return TAKEN;
           change((values) => renameInput(values, input.id, id));
           onRenamed(id);
+          return null;
+        }}
+      />
+      <CommitField
+        label="Display name (optional)"
+        value={input.title ?? ''}
+        placeholder={input.id}
+        apply={(written) => {
+          update({ title: formText(written) });
           return null;
         }}
       />
@@ -828,42 +835,30 @@ function InputRow({
         />
       )}
       <Checkbox
-        label="A task may leave it out"
+        label="Optional"
         checked={input.optional}
         onChange={(optional) => update({ optional })}
       />
-      <div className={classes.formText}>
+      {(input.type === 'number' || input.unit !== null) && (
+        // Only a number takes one; another type shows one only to clear it.
         <CommitField
-          label="Title on the task’s form"
-          value={input.title ?? ''}
-          placeholder={input.id}
+          label="Unit"
+          value={input.unit ?? ''}
+          placeholder="seconds"
+          description={
+            input.type === 'number'
+              ? undefined
+              : 'Only a number takes a unit, so clear this one.'
+          }
           apply={(written) => {
-            update({ title: formText(written) });
+            update({ unit: formText(written) });
             return null;
           }}
         />
-        {(input.type === 'number' || input.unit !== null) && (
-          // Only a number takes one; another type shows one only to clear it.
-          <CommitField
-            label="Unit"
-            value={input.unit ?? ''}
-            placeholder="seconds"
-            description={
-              input.type === 'number'
-                ? undefined
-                : 'Only a number takes a unit, so clear this one.'
-            }
-            apply={(written) => {
-              update({ unit: formText(written) });
-              return null;
-            }}
-          />
-        )}
-      </div>
+      )}
       <CommitField
-        label="Help on the task’s form"
+        label="Description (optional)"
         value={input.help ?? ''}
-        description="One sentence saying what it is for, shown beside its title."
         apply={(written) => {
           update({ help: formText(written) });
           return null;
@@ -1155,12 +1150,20 @@ function EntryRow({
   return (
     <li className={classes.declaration} aria-label={`The output ${entry.name}`}>
       <CommitField
-        label="Name"
+        label="Key"
         value={entry.name}
-        description="A task reads it by this name, as a column of its runs."
         apply={(name) => {
           if (name !== entry.name && sharedNames(workflow).includes(name)) return TAKEN;
           change((values) => renameEntry(values, entry.name, name));
+          return null;
+        }}
+      />
+      <CommitField
+        label="Display name (optional)"
+        value={entry.title ?? ''}
+        placeholder={entry.name}
+        apply={(written) => {
+          write({ title: formText(written) });
           return null;
         }}
       />
@@ -1174,35 +1177,23 @@ function EntryRow({
           if (ref !== undefined) write({ from: ref });
         }}
       />
-      <div className={classes.formText}>
+      {(isNumber || entry.unit !== null) && (
+        // Only a number takes one; text shows one only to clear it.
         <CommitField
-          label="Title"
-          value={entry.title ?? ''}
-          placeholder={entry.name}
-          description="What pages call it, such as Run time. Without one, they use its name."
+          label="Unit"
+          value={entry.unit ?? ''}
+          placeholder="ms"
+          description={
+            type === null || isNumber
+              ? undefined
+              : 'Only a number takes a unit, so clear this one.'
+          }
           apply={(written) => {
-            write({ title: formText(written) });
+            write({ unit: formText(written) });
             return null;
           }}
         />
-        {(isNumber || entry.unit !== null) && (
-          // Only a number takes one; text shows one only to clear it.
-          <CommitField
-            label="Unit"
-            value={entry.unit ?? ''}
-            placeholder="ms"
-            description={
-              type === null || isNumber
-                ? undefined
-                : 'Only a number takes a unit, so clear this one.'
-            }
-            apply={(written) => {
-              write({ unit: formText(written) });
-              return null;
-            }}
-          />
-        )}
-      </div>
+      )}
       {(pinned.entries.get(entry.name) ?? []).map((problem) => (
         <p key={problem.message} className={classes.problemText}>
           {problem.message}

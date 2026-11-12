@@ -369,6 +369,11 @@
   cursor: pointer;
 }
 
+/* Beside its port's row, centred on it. */
+.fedPill {
+  transform: translateY(-50%);
+}
+
 .fedTab:focus-visible {
   outline: 2px solid var(--mantine-primary-color-filled);
   outline-offset: 1px;

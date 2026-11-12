@@ -175,13 +175,11 @@ describe('the workflow editor', () => {
   it('greys out a wire whose type the port does not take, saying why, in the port’s menu', async () => {
     const { user } = openEditor();
 
-    await user.click(await portButton(user, 'run', 'entry'));
-    const menu = await openMenu('The port entry of run');
+    await user.click(await portButton(user, 'run', 'time_limit'));
+    const menu = await openMenu('The port time_limit of run');
     const file = within(menu).getByRole('menuitem', { name: /^input from the inputs/ });
     expect(file).toBeDisabled();
-    expect(file).toHaveTextContent(
-      'This takes text, a number, true or false or one of a list, not a file.',
-    );
+    expect(file).toHaveTextContent('This takes a number, not a file.');
     expect(
       within(menu).getByRole('menuitem', { name: /^submission from the inputs/ }),
     ).toBeDisabled();
@@ -190,14 +188,14 @@ describe('the workflow editor', () => {
   it('wires a port from its menu, and saves it as values', async () => {
     const { user } = openEditor();
 
-    await user.click(await portButton(user, 'run', 'args'));
-    const menu = await openMenu('The port args of run');
+    await user.click(await portButton(user, 'run', 'stdin'));
+    const menu = await openMenu('The port stdin of run');
     await user.click(
-      within(menu).getByRole('menuitem', { name: /^time_limit from the inputs/ }),
+      within(menu).getByRole('menuitem', { name: /^answer from the inputs/ }),
     );
 
     const saved = await savedValues(user);
-    expect(withOf(saved, 'run').args).toBe('${{ inputs.time_limit }}');
+    expect(withOf(saved, 'run').stdin).toBe('${{ inputs.answer }}');
     expect(saved).toEqual({
       ...valuesOf(CLASSIC),
       steps: [
@@ -205,7 +203,7 @@ describe('the workflow editor', () => {
           ...(valuesOf(CLASSIC).steps as Values[])[0],
           with: {
             ...withOf(valuesOf(CLASSIC), 'run'),
-            args: '${{ inputs.time_limit }}',
+            stdin: '${{ inputs.answer }}',
           },
         },
         (valuesOf(CLASSIC).steps as Values[])[1],
@@ -216,7 +214,7 @@ describe('the workflow editor', () => {
   it('writes what the workflow does into its file as the field is left, and undo takes it back', async () => {
     const { user } = openEditor();
 
-    const field = await screen.findByRole('textbox', { name: 'What it does' });
+    const field = await screen.findByRole('textbox', { name: 'Description' });
     await user.type(field, 'Judges one run by its answer.');
     await user.tab();
 
@@ -227,7 +225,7 @@ describe('the workflow editor', () => {
     });
     expect(Object.keys(saved)[0]).toBe('description');
     await user.click(toolButton('Undo'));
-    expect(screen.getByRole('textbox', { name: 'What it does' })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveValue('');
   });
 
   it('removes a step and undo brings it back with its wires', async () => {
@@ -257,7 +255,7 @@ describe('the workflow editor', () => {
     const run = await stepBox('run');
     expect(run).not.toHaveAttribute('data-open');
     expect(run).toHaveTextContent(
-      'needs source, language, entry, stdin, files, loads, manifest, self_reported, args, time_limit, memory_limit · gives output, time_ms, memory_kb, label, message, staff_message, extras, log',
+      'needs source, language, stdin, time_limit, memory_limit · gives output, time_ms, memory_kb, label, message, staff_message, extras, log',
     );
     expect(within(run).queryByRole('button', { name: /^The port / })).toBeNull();
 
@@ -266,9 +264,11 @@ describe('the workflow editor', () => {
     expect(open).toHaveAttribute('data-open');
     expect(open).not.toHaveTextContent('needs source');
     expect(
-      within(open).getByRole('button', { name: 'The port args of run' }),
+      within(open).getByRole('button', { name: 'The port stdin of run' }),
     ).toBeVisible();
-    expect(open).toHaveTextContent('args(optional)text · nothing yet');
+    expect(
+      within(open).queryByRole('button', { name: 'The port args of run' }),
+    ).toBeNull();
     expect(await stepBox('check')).not.toHaveAttribute('data-open');
 
     await user.click(within(drawer('Step run')).getByRole('button', { name: 'Close' }));
@@ -514,7 +514,7 @@ describe('the workflow editor', () => {
     expect(
       within(drawer('Inputs')).getByLabelText('The input number', { selector: 'li' }),
     ).toBeInTheDocument();
-    for (const type of ['Text', 'True or false', 'One of a list', 'File', 'Folder'])
+    for (const type of ['Text', 'Boolean', 'Selection', 'File', 'Folder'])
       await user.click(trayButton('Inputs', type));
     // A second of a type is numbered, with an underscore, as the forge names.
     await user.click(trayButton('Inputs', 'Number'));
@@ -537,7 +537,7 @@ describe('the workflow editor', () => {
     const row = within(drawer('Inputs')).getByLabelText('The input time_limit', {
       selector: 'li',
     });
-    const name = within(row).getByRole('textbox', { name: 'Name' });
+    const name = within(row).getByRole('textbox', { name: 'Key' });
     await user.clear(name);
     await user.type(name, 'seconds{Enter}');
 
@@ -579,7 +579,7 @@ describe('the workflow editor', () => {
     const row = within(drawer('Inputs')).getByLabelText('The input answer', {
       selector: 'li',
     });
-    const name = within(row).getByRole('textbox', { name: 'Name' });
+    const name = within(row).getByRole('textbox', { name: 'Key' });
     await user.clear(name);
     await user.type(name, 'log{Enter}');
 
@@ -614,12 +614,12 @@ describe('the workflow editor', () => {
       selector: 'li',
     });
     await user.type(
-      within(row).getByRole('textbox', { name: 'Title on the task’s form' }),
+      within(row).getByRole('textbox', { name: 'Display name (optional)' }),
       'Memory limit{Enter}',
     );
     await user.type(within(row).getByRole('textbox', { name: 'Unit' }), 'MB{Enter}');
     await user.type(
-      within(row).getByRole('textbox', { name: 'Help on the task’s form' }),
+      within(row).getByRole('textbox', { name: 'Description (optional)' }),
       'The memory the program may use.{Enter}',
     );
 
@@ -813,7 +813,7 @@ describe('the workflow editor', () => {
       });
     expect(within(row('log')).queryByRole('textbox', { name: 'Unit' })).toBeNull();
     await user.type(
-      within(row('time_ms')).getByRole('textbox', { name: 'Title' }),
+      within(row('time_ms')).getByRole('textbox', { name: 'Display name (optional)' }),
       'Run time{Enter}',
     );
     await user.type(
@@ -821,7 +821,7 @@ describe('the workflow editor', () => {
       'ms{Enter}',
     );
     await user.type(
-      within(row('log')).getByRole('textbox', { name: 'Title' }),
+      within(row('log')).getByRole('textbox', { name: 'Display name (optional)' }),
       'Compile log{Enter}',
     );
 
@@ -836,7 +836,9 @@ describe('the workflow editor', () => {
       within(outputs).getByText('number · ms · time_ms from run'),
     ).toBeInTheDocument();
 
-    const title = within(row('log')).getByRole('textbox', { name: 'Title' });
+    const title = within(row('log')).getByRole('textbox', {
+      name: 'Display name (optional)',
+    });
     await user.clear(title);
     await user.type(title, '{Enter}');
     expect((await savedValues(user)).outputs).toMatchObject({
@@ -921,7 +923,7 @@ describe('the workflow editor', () => {
     const { user } = openEditor({ draft: two });
 
     const panel = await openStep(user, 'first');
-    const name = within(panel).getByRole('textbox', { name: 'Name' });
+    const name = within(panel).getByRole('textbox', { name: 'Key' });
     await user.clear(name);
     await user.type(name, 'opened{Enter}');
 
@@ -1344,7 +1346,7 @@ describe('the drawer', () => {
     // At the draft, Details opens the step's own drawer, to change it.
     await user.click(screen.getByRole('button', { name: 'Details' }));
     expect(
-      within(stepPanel('build')).getByRole('textbox', { name: 'Name' }),
+      within(stepPanel('build')).getByRole('textbox', { name: 'Key' }),
     ).toBeInTheDocument();
     await user.keyboard('{Escape}');
 
@@ -1364,7 +1366,7 @@ describe('the drawer', () => {
     await stepBox('build');
     await user.click(await screen.findByRole('button', { name: 'Open build' }));
     await user.click(await screen.findByRole('button', { name: 'Details' }));
-    const name = within(stepPanel('build')).getByRole('textbox', { name: 'Name' });
+    const name = within(stepPanel('build')).getByRole('textbox', { name: 'Key' });
     await user.clear(name);
     await user.type(name, 'built{Enter}');
     const crumbs = screen.getByRole('navigation', { name: 'Inside the workflow' });
@@ -1646,7 +1648,7 @@ describe('a file the workflow gives, not the task', () => {
     expect(await findPart('[role="group"]', 'Input other')).toHaveTextContent(
       'Read by run',
     );
-    expect(within(drawer('Inputs')).getByRole('textbox', { name: 'Name' })).toHaveValue(
+    expect(within(drawer('Inputs')).getByRole('textbox', { name: 'Key' })).toHaveValue(
       'other',
     );
     const saved = await savedValues(user);
@@ -1810,11 +1812,9 @@ outputs:
     expect(
       await screen.findByRole('group', { name: 'Workflow file checker/' }),
     ).toHaveTextContent('Read by check');
-    await user.click(await portButton(user, 'check', 'manifest'));
-    await user.click(
-      within(await openMenu('The port manifest of check')).getByRole('menuitem', {
-        name: 'the workflow’s checker/program.yaml',
-      }),
+    await user.selectOptions(
+      within(stepPanel('check')).getByRole('combobox', { name: 'manifest (optional)' }),
+      'the workflow’s checker/program.yaml',
     );
     expect(
       await screen.findByRole('group', { name: 'Workflow file checker/program.yaml' }),

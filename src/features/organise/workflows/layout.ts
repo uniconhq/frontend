@@ -139,7 +139,10 @@ function stepIndexes(workflow: Workflow): Map<string, number> {
 }
 
 /** The ports of a run workflow drawn as a box, when the step is not a primitive. */
-export type StepPorts = { inputs: string[]; outputs: string[] };
+export type StepPorts = {
+  inputs: { name: string; optional: boolean }[];
+  outputs: string[];
+};
 
 /**
  * Which boxes are drawn open, or all of them, as a box's inside is; which
@@ -153,7 +156,11 @@ export type Drawn = {
   inputs?: 'shown' | 'hidden';
 };
 
-/** The ports of each step: the primitive's own, or a box's, then the rest the file uses. */
+/**
+ * The ports of each step: the primitive's or box's inputs, an optional one
+ * only once it is given, then the rest the file gives. The step's panel
+ * lists them all.
+ */
 function stepPorts(
   workflow: Workflow,
   primitives: Map<string, PrimitiveInfo>,
@@ -165,11 +172,21 @@ function stepPorts(
   workflow.steps.forEach((step) => {
     const primitive = declared(primitives, step);
     const box = boxes.get(step.use);
-    const inputs =
-      primitive !== null ? Object.keys(primitive.inputs) : (box?.inputs ?? []);
+    const declaredPorts =
+      primitive !== null
+        ? Object.entries(primitive.inputs).map(([name, port]) => ({
+            name,
+            optional: port.optional,
+          }))
+        : (box?.inputs ?? []);
+    const inputs = declaredPorts
+      .filter((port) => !port.optional || port.name in step.with)
+      .map((port) => port.name);
     left.push([
       ...inputs,
-      ...Object.keys(step.with).filter((port) => !inputs.includes(port)),
+      ...Object.keys(step.with).filter(
+        (port) => !declaredPorts.some((found) => found.name === port),
+      ),
     ]);
     const outputs =
       primitive !== null

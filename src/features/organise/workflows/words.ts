@@ -112,13 +112,13 @@ export function visibilityWords(
 const TYPE_WORDS: Record<string, string> = {
   text: 'Text',
   number: 'Number',
-  boolean: 'True or false',
-  enum: 'One of a list',
+  boolean: 'Boolean',
+  enum: 'Selection',
   file: 'File',
   folder: 'Folder',
 };
 
-/** A value's type as a person names it: "One of a list" for `enum`. */
+/** A value's type as a person names it: "Selection" for `enum`. */
 export function typeWords(type: string): string {
   return TYPE_WORDS[type] ?? type;
 }
