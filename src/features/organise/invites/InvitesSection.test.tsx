@@ -294,9 +294,6 @@ describe('the organisers’ invites', () => {
       'manager',
       'observer',
     ]);
-    expect(options[0]).toHaveAccessibleDescription(
-      'Change grading and schedule settings. Publish changes. Manage entrants and approve registrations. Give or take manager and observer roles.',
-    );
   });
 });
 

@@ -9,6 +9,7 @@ import { TextInput } from '@/ui/TextInput';
 import { Group } from '@/ui/layout';
 import { ContestFile, FieldBox } from '../contest/ContestFile';
 import { useOpenedField } from '../contest/opened';
+import { VISIBILITY_CHOICES } from '../contest/words';
 import { readContest, writeContest, type ContestValues } from './contest-values';
 import { Fieldset, NumberField, TimeField } from './fields';
 import { numberProblem } from './values';
@@ -22,8 +23,8 @@ function teamsOn(values: ContestValues): boolean {
 
 /**
  * The contest's settings that are neither how people enter, its state, its
- * tasks nor its leaderboards, in sections: its name and description, when it
- * runs, and whether people enter in teams. Each section has a heading and
+ * tasks nor its leaderboards, in sections: its name and description, who
+ * sees it, when it runs, and whether people enter in teams. Each section has a heading and
  * a line saying what it is for. A manager sees the admin's settings and
  * cannot change them.
  */
@@ -95,6 +96,21 @@ function SettingsForm({
               onChange={(value) => set('description', value)}
               readOnly={!admin}
               rows={3}
+            />
+          </FieldBox>
+        </Fieldset>
+
+        <Fieldset
+          legend="Who sees it"
+          note="Who may enter is set under How people enter."
+        >
+          <FieldBox name="visibility">
+            <RadioGroup
+              label="Who sees the contest"
+              value={values.visibility}
+              options={VISIBILITY_CHOICES}
+              onChange={(visibility) => set('visibility', visibility)}
+              disabled={!admin}
             />
           </FieldBox>
         </Fieldset>

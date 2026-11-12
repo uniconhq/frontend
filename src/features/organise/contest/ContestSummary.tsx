@@ -4,16 +4,15 @@ import { Loaded } from '@/ui/feedback/Loaded';
 import { contestSectionPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { registrationSentence } from '../forms/ways';
-import { teamsSentence } from './words';
+import { VISIBILITY_CHOICES, teamsSentence } from './words';
 import { useContestSettings } from './settings';
-import classes from './contest.module.css';
+import { Summary } from '../hub/Status';
 
 /** The form holds this time in the organiser's own zone. */
 function when(local: string): string {
   return local === '' ? 'Not set' : formatDateTime(new Date(local));
 }
 
-/** Who sees the contest is on its Status card. */
 export function ContestSummary({ org, contest }: { org: string; contest: string }) {
   const view = useContestSettings(org, contest);
   return (
@@ -23,22 +22,23 @@ export function ContestSummary({ org, contest }: { org: string; contest: string 
           values === null ? (
             <BodyText>The settings cannot be read. Open them to fix them.</BodyText>
           ) : (
-            <dl className={classes.summary} aria-label="The settings">
-              <div>
-                <dt>Schedule</dt>
-                <dd>
-                  {when(values.start)} to {when(values.end)}
-                </dd>
-              </div>
-              <div>
-                <dt>How people enter</dt>
-                <dd>{registrationSentence(values)}</dd>
-              </div>
-              <div>
-                <dt>Teams</dt>
-                <dd>{teamsSentence(values)}</dd>
-              </div>
-            </dl>
+            <Summary
+              label="The settings"
+              items={[
+                {
+                  term: 'Schedule',
+                  value: `${when(values.start)} to ${when(values.end)}`,
+                },
+                { term: 'How people enter', value: registrationSentence(values) },
+                { term: 'Teams', value: teamsSentence(values) },
+                {
+                  term: 'Who sees it',
+                  value:
+                    VISIBILITY_CHOICES.find((one) => one.value === values.visibility)
+                      ?.label ?? 'Not set',
+                },
+              ]}
+            />
           )
         }
       </Loaded>

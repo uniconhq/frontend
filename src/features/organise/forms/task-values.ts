@@ -35,9 +35,8 @@ export type TaskValues = {
   workflow: string;
   inputs: InputValues[];
   /**
-   * One axis of `repeat`: the inputs that move together, and one tuple per
-   * row. A second axis is crossed with the first, so 2 and 3 tuples make 6
-   * runs.
+   * The runs table, `repeat`: the inputs that change from run to run, and
+   * one tuple per run.
    */
   axes: AxisValues[];
   /** Groups of runs, by the repeated inputs they pick. */
@@ -143,18 +142,6 @@ export function withoutInput(axis: AxisValues, id: string): AxisValues {
       return { ...tuple, cells };
     }),
   };
-}
-
-/**
- * The axes with every one that has inputs first. An axis with none is not
- * written, so it cannot sit before one that is: a refusal names axes as the
- * file numbers them, and the card's fields use that same number.
- */
-export function settled(axes: AxisValues[]): AxisValues[] {
-  return [
-    ...axes.filter((axis) => axis.inputs.length > 0),
-    ...axes.filter((axis) => axis.inputs.length === 0),
-  ];
 }
 
 /** Whether the file holds an input the other way from how the workflow declares it. */

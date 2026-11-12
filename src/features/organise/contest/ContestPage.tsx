@@ -99,6 +99,7 @@ export function ContestPage() {
               title={section.label}
               to={contestSectionPath(org, contest, section.key)}
             >
+              <p>{section.line}</p>
               <Card path={{ org, contest }} />
             </HubCard>
           );

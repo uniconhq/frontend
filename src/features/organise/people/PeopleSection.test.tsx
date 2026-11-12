@@ -221,11 +221,6 @@ describe('the organisers section', () => {
         .getAllByRole('radio')
         .map((option) => option.getAttribute('value')),
     ).toEqual(['manager', 'observer']);
-    expect(
-      within(roles).getByRole('radio', { name: 'Observer' }),
-    ).toHaveAccessibleDescription(
-      'Read settings without changing them. Read publications without publishing. Read entrants without changing them. Read roles without giving or taking them.',
-    );
   });
 
   it('keeps a refusal about the role that was sent while another is picked', async () => {
@@ -279,12 +274,9 @@ describe('the organisers section', () => {
       ),
     );
     renderApp('/orgs/acme/contests/spring/tasks/sum/organisers');
-    const matrix = await screen.findByRole('table', { name: 'What each role can do' });
-    expect(
-      within(matrix).getAllByText('Entrants are managed at contest level.'),
-    ).toHaveLength(3);
-    expect(matrix).not.toHaveTextContent('Manage entrants and approve registrations.');
-    expect(matrix).not.toHaveTextContent('Read entrants without changing them.');
+    const matrix = await screen.findByRole('group', { name: 'What each role can do' });
+    expect(matrix).toHaveTextContent('Build, publish and rejudge the task.');
+    expect(matrix).not.toHaveTextContent(/entrants/);
   });
 
   it('shows an observer the list and nothing to change', async () => {
@@ -293,15 +285,15 @@ describe('the organisers section', () => {
       http.get(ORG_ROLES, () => HttpResponse.json([holder({}, { may_change: false })])),
     );
     renderApp('/orgs/acme/organisers');
-    const matrix = await screen.findByRole('table', { name: 'What each role can do' });
-    expect(within(matrix).getAllByRole('row')).toHaveLength(4);
+    const matrix = await screen.findByRole('group', { name: 'What each role can do' });
     expect(
       within(matrix)
-        .getAllByRole('columnheader')
-        .map((cell) => cell.textContent),
-    ).toEqual(['Role', 'Change settings', 'Publish', 'Manage entrants', 'Give roles']);
-    expect(matrix).toHaveTextContent('Give or take every role, including admin.');
-    expect(matrix).toHaveTextContent('Read settings without changing them.');
+        .getAllByRole('heading')
+        .map((heading) => heading.textContent),
+    ).toEqual(['Admin', 'Manager', 'Observer']);
+    expect(matrix).toHaveTextContent('Everything a manager can do, and:');
+    expect(matrix).toHaveTextContent('Give or take the admin role.');
+    expect(matrix).toHaveTextContent('See everything here, without changing anything.');
 
     await screen.findByRole('table', { name: / organisers$/ });
     expect(

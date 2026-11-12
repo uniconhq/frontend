@@ -37,7 +37,7 @@ const SEEN = 'Entrants may have seen this. The save asks before hiding it.';
 /** What a run entry's `of` reads as in its picker. */
 function ofLabel(of: string): string {
   if (of === 'all') return 'all, every run';
-  if (of === FIRST_NOT_PASSED) return 'The first run not passed';
+  if (of === FIRST_NOT_PASSED) return 'The first failed run';
   return of;
 }
 

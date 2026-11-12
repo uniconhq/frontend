@@ -1,4 +1,3 @@
-import { Group } from '@mantine/core';
 import { useRef, useState } from 'react';
 import type { RunShown, ShownFile, TaskRun } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -12,6 +11,7 @@ import {
   shownPath,
   tupleLine,
 } from './scored-text';
+import { RunsTable } from './RunsTable';
 import classes from './scored.module.css';
 
 /**
@@ -164,15 +164,14 @@ export function RunInputs({
 /**
  * What a task's page shows before any submission: the settings its show
  * names, and each run an entry names with the inputs it names, under the
- * entry's `of`. Nothing when it shows neither. A run given `fields`, as a
- * preview with no submission gives it, says where they will appear.
+ * entry's `of`. Nothing when it shows neither.
  */
 export function ShownTask({
   runs,
   inputs,
   readFiles,
 }: {
-  runs: (TaskRun & { fields?: string[] })[];
+  runs: TaskRun[];
   inputs: Record<string, unknown>;
   readFiles?: ReadFiles;
 }) {
@@ -181,22 +180,19 @@ export function ShownTask({
     <div className={classes.stack}>
       <ShownInputs inputs={inputs} readFiles={readFiles} />
       {groupsOf(runs).map((group) => (
-        <section
+        <RunsTable
           key={group.name}
-          aria-label={`Group ${entryTitle(group.name)}`}
-          className={classes.stack}
-        >
-          <BodyText>{entryTitle(group.name)}</BodyText>
-          {group.runs.map((run) => (
-            <Group key={String(run.place)} gap="8px 14px" align="baseline">
-              <BodyText>{runTitle(run)}</BodyText>
-              <RunInputs run={run} readFiles={readFiles} />
-              {run.fields !== undefined && run.fields.length > 0 && (
-                <BodyText tone="secondary">{`${run.fields.join(', ')} ${run.fields.length === 1 ? 'appears' : 'appear'} here`}</BodyText>
-              )}
-            </Group>
-          ))}
-        </section>
+          group={group.name}
+          runs={group.runs}
+          keyOf={(run) => String(run.place)}
+          columns={[
+            { title: 'Run', cell: (run) => runTitle(run) },
+            {
+              title: 'Input',
+              cell: (run) => <RunInputs run={run} readFiles={readFiles} />,
+            },
+          ]}
+        />
       ))}
     </div>
   );

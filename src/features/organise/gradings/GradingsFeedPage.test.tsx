@@ -600,7 +600,7 @@ describe('acting on the feed', () => {
       'sum',
     );
     expect(dialog).toHaveTextContent(
-      'Every submission to B · sum runs again on the task as it is now, its latest publication.',
+      'Every submission to B · sum is graded again on the task as it is now.',
     );
     await user.click(confirm);
 

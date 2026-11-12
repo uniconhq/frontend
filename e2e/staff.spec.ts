@@ -69,6 +69,7 @@ async function stub(page: Page) {
         workflow: null,
         yanked: null,
         text_values: null,
+        limits: { max: 50, count: 1, per: 30 },
       } satisfies Schemas['WorkflowForm']);
     }
     if (path === '/api/v1/orgs/acme/contests') return forbidden(route);

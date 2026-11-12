@@ -121,7 +121,7 @@ describe("a contest's stored settings that cannot be read", () => {
       ),
       ...repoFiles,
     );
-    renderApp(CONTEST_SETTINGS);
+    renderApp(`${CONTEST_SETTINGS}#file`);
 
     const part = await stored();
     expect(await within(part).findByText('Couldn’t load')).toBeVisible();
@@ -216,7 +216,7 @@ describe("saving the contest's settings as text", () => {
         return HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] });
       }),
     );
-    renderApp(CONTEST_SETTINGS);
+    renderApp(`${CONTEST_SETTINGS}#file`);
 
     const editor = await settingsText();
     const before = reads.count;
@@ -391,7 +391,7 @@ describe('settings someone else saved first', () => {
   it('saves one’s own over theirs only after a warning', async () => {
     const sent = conflicting();
     const user = userEvent.setup();
-    renderApp(CONTEST_SETTINGS);
+    renderApp(`${CONTEST_SETTINGS}#file`);
 
     await user.type(await settingsText(), 'mine');
     await user.click(saveButton());

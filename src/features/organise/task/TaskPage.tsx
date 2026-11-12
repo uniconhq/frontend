@@ -8,7 +8,7 @@ import { PageLink } from '@/ui/PageLink';
 import { useTaskParams } from '@/lib/route-params';
 import { TASK_SECTIONS, taskSectionPath, type TaskSectionKey } from '@/lib/sections';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { TaskStanding } from './TaskHeader';
+import { TaskStanding, TaskStateLine } from './TaskHeader';
 import { whenDrawn } from '@/ui/anchor';
 import { useOpenedField } from '../contest/opened';
 import { STORED } from '../contest/places';
@@ -27,7 +27,6 @@ import {
   PublicationsCard,
   QueueCard,
 } from './TaskCards';
-import { ResultsControls } from './ResultsControls';
 
 type TaskPath = { org: string; contest: string; task: string };
 type CardLine = (props: { path: TaskPath }) => ReactNode;
@@ -35,13 +34,12 @@ type CardLine = (props: { path: TaskPath }) => ReactNode;
 const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
 
 /** The line of each section's card in the grid, by its key in the list. */
-const GRID_CARDS: Record<TaskSectionKey, CardLine | null> = {
+const GRID_CARDS: Record<Exclude<TaskSectionKey, 'settings'>, CardLine> = {
   gradings: GradingsCard,
   marking: QueueCard,
   publications: PublicationsCard,
   announcements: AnnouncementsCard,
   organisers: ({ path }) => <OrganisersLine place={{ kind: 'task', ...path }} />,
-  settings: null,
 };
 
 /** The task's title, as its settings give it, or its name until they are read. */
@@ -107,15 +105,14 @@ export function TaskPage() {
     <Page>
       <PageHeader
         title={<TaskTitle place={place} />}
+        meta={<TaskStateLine place={place} />}
         links={
           <PageLink to={`${taskSectionPath(org, contest, task, 'settings')}#${STORED}`}>
             View file
           </PageLink>
         }
-      >
-        <TaskStanding place={place} saving={saving} manager={manager} />
-        <ResultsControls path={path} manager={manager} />
-      </PageHeader>
+      />
+      <TaskStanding place={place} saving={saving} manager={manager} />
       <TaskBuild
         place={place}
         saving={saving}
@@ -131,7 +128,10 @@ export function TaskPage() {
         <StatementEditor place={place} admin={admin} onDirty={onStatement} />
       </BuildCard>
       <CardGrid label="Running the task">
-        {TASK_SECTIONS.map((section) => {
+        {TASK_SECTIONS.filter(
+          (section): section is Extract<typeof section, { card: 'grid' }> =>
+            section.card === 'grid',
+        ).map((section) => {
           const Line = GRID_CARDS[section.key];
           return (
             <HubCard
@@ -140,7 +140,7 @@ export function TaskPage() {
               to={taskSectionPath(org, contest, task, section.key)}
             >
               <p>{section.line}</p>
-              {Line !== null && <Line path={path} />}
+              <Line path={path} />
             </HubCard>
           );
         })}

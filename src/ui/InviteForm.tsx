@@ -31,7 +31,8 @@ export function InviteForm({
   name: string;
   className?: string;
   label?: string;
-  description: string;
+  /** Only to say something the field can't, such as a full team. */
+  description?: string;
   required?: boolean;
   disabled?: boolean;
   size?: 'xs';

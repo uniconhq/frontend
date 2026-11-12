@@ -103,7 +103,7 @@ export function WorkflowCard({
     <BuildCard
       id="workflow"
       title="Workflow"
-      line="How every submission is graded. Choose a workflow, and the cards below ask for what it needs."
+      line="How every submission is graded."
       aside={saved !== null ? <WorkflowChip workflow={saved} /> : undefined}
     >
       {saved === null && chosen === '' && (

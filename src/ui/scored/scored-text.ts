@@ -21,9 +21,9 @@ export function groupsOf<Run extends { group: string }>(
   return order.map((name) => ({ name, runs: by.get(name) ?? [] }));
 }
 
-/** What an entry's runs are headed: its group, or what the first run not passed is. */
+/** What an entry's runs are headed: its group, or the first failed run. */
 export function entryTitle(of: string): string {
-  return of === FIRST_NOT_PASSED ? 'First test not passed' : of;
+  return of === FIRST_NOT_PASSED ? 'First failed run' : of;
 }
 
 /**

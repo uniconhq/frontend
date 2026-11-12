@@ -12,7 +12,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { Group, Stack } from '@/ui/layout';
 import { formatDateTime } from '@/lib/time';
-import { ROLE_LABEL, roleMeans, type RolePlace } from '../roles';
+import { ROLE_LABEL, type RolePlace } from '../roles';
 import { invitesQuery, useInviteChanges, useInvites } from './invites';
 import tableClasses from '@/ui/table.module.css';
 import classes from './invites.module.css';
@@ -239,15 +239,12 @@ function InviteSomeone({
   };
 
   const meansOf = (offer: OfferedGrant) =>
-    offer === 'contestant'
-      ? 'Accepting registers them for this contest.'
-      : roleMeans(offer, place.kind).join(' ');
+    offer === 'contestant' ? 'Accepting registers them for this contest. ' : '';
 
   return (
     <InviteForm
       name="Invite someone"
       className={classes.form}
-      description="A username for someone with an account, an email address for anyone."
       required
       loading={change.pending !== null}
       onInvite={invite}
@@ -269,14 +266,13 @@ function InviteSomeone({
           options={grants.map((value) => ({
             value,
             label: GRANT_LABEL[value],
-            description: meansOf(value),
           }))}
           onChange={(value) => setGrant(value as OfferedGrant)}
         />
       )}
       <BodyText tone="secondary">
-        {grants.length > 1 ? '' : `${meansOf(grant)} `}The invite expires after{' '}
-        {STANDS_DAYS} days.
+        {grants.length > 1 ? '' : meansOf(grant)}The invite expires after {STANDS_DAYS}{' '}
+        days.
       </BodyText>
     </InviteForm>
   );

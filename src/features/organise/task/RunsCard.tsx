@@ -15,7 +15,6 @@ import { FieldBox } from '../contest/ContestFile';
 import { FIELD_PARAM } from '../contest/places';
 import {
   emptyTuple,
-  settled,
   withoutInput,
   type AxisValues,
   type TupleValues,
@@ -25,7 +24,7 @@ import { inputTitle, type TaskPlace } from './build-data';
 import type { StagedInput } from './input-files';
 import { useNamed } from './named-file';
 import { runName } from './scoring-model';
-import { cellPath, pairRunFiles } from './run-files';
+import { pairRunFiles } from './run-files';
 import tableClasses from '@/ui/table.module.css';
 import classes from './task.module.css';
 
@@ -36,9 +35,9 @@ const FILE = new Set(['file', 'folder']);
 const LINE =
   'The tests a submission is run on. Each row is one run and what it is given. A submission runs once for every row, and Scoring adds up what the runs give.';
 type Target = { table: number; row: number; input: string };
-type ChooseFile = (target: Target, path: string, file: File) => void;
+type ChooseFile = (target: Target, file: File) => void;
 
-/** The changing inputs as lined-up tables, with uploads staged by the task’s save. */
+/** The inputs that change from run to run, as one table, with uploads staged by the task’s save. */
 export function RunsCard({
   active,
   place,
@@ -63,7 +62,6 @@ export function RunsCard({
   onFile: ChooseFile;
   onDiscard: (path: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [pending, setPending] = useState<File[]>([]);
   const first = axes[0];
   const fileColumns =
@@ -72,7 +70,6 @@ export function RunsCard({
     ) ?? [];
   const pairing =
     first === undefined ? null : pairRunFiles(pending, first, fileColumns);
-  const shown = axes.filter((axis) => axis.inputs.length > 0);
   const setAxis = (table: number, axis: AxisValues) =>
     onChange(axes.map((item, index) => (index === table ? axis : item)));
   const table = (axis: AxisValues, index: number) => (
@@ -80,8 +77,8 @@ export function RunsCard({
       <div className={tableClasses.scroll}>
         <table
           className={classes.runTable}
-          aria-label={index === 0 ? 'Runs' : `Table ${String(index + 1)}`}
-          style={{ minWidth: `${String(19 + axis.inputs.length * 14)}rem` }}
+          aria-label="Runs"
+          style={{ minWidth: `${String(19.5 + axis.inputs.length * 14)}rem` }}
         >
           <thead>
             <tr>
@@ -115,10 +112,8 @@ export function RunsCard({
                             label={`Remove ${id}`}
                             onClick={() =>
                               onChange(
-                                settled(
-                                  axes.map((item, at) =>
-                                    at === index ? withoutInput(item, id) : item,
-                                  ),
+                                axes.map((item, at) =>
+                                  at === index ? withoutInput(item, id) : item,
                                 ),
                               )
                             }
@@ -143,7 +138,6 @@ export function RunsCard({
                 row={row}
                 tuple={tuple}
                 axis={axis}
-                axes={axes}
                 declared={declared}
                 staged={staged}
                 disabled={disabled}
@@ -182,11 +176,7 @@ export function RunsCard({
           </Button>
         )}
         {count !== null && (
-          <BodyText>
-            {index === 0 && shown.length > 1
-              ? `${shown.map((axis, at) => `${String(axis.tuples.length)}${at > 0 ? '' : axis.tuples.length === 1 ? ' row' : ' rows'}`).join(' × ')} = ${String(count)} ${count === 1 ? 'run' : 'runs'}`
-              : `This makes ${String(index === 0 ? count : axis.tuples.length)} ${count === 1 ? 'run' : 'runs'}.`}
-          </BodyText>
+          <BodyText>{`This makes ${String(count)} ${count === 1 ? 'run' : 'runs'}.`}</BodyText>
         )}
       </div>
     </div>
@@ -197,7 +187,7 @@ export function RunsCard({
         <BodyText>
           The runs are set here once the workflow can be read, as they give its inputs.
         </BodyText>
-      ) : shown.length === 0 ? (
+      ) : first === undefined || first.inputs.length === 0 ? (
         <BodyText>
           A submission runs once, since nothing changes from run to run. To run it on
           several tests, set an input to 'You set one for each run' on the Inputs card.
@@ -206,7 +196,7 @@ export function RunsCard({
         <>
           {fileColumns.length > 0 && !disabled && (
             <FileDrop
-              label="Add files"
+              label="Batch add"
               layout="button"
               multiple
               files={pending}
@@ -254,28 +244,9 @@ export function RunsCard({
                         },
                       })),
                     };
-                    const nextAxes = axes.map((axis, index) =>
-                      index === 0 ? next : axis,
-                    );
-                    const reserved = nextAxes.map((axis) => ({
-                      ...axis,
-                      tuples: axis.tuples.map((tuple) => ({
-                        ...tuple,
-                        cells: { ...tuple.cells },
-                      })),
-                    }));
-                    onChange(nextAxes);
-                    for (const pair of pairing.pairs) {
-                      const path = cellPath(reserved, 0, pair.row, pair.input);
-                      const tuple = reserved[0]?.tuples[pair.row];
-                      if (tuple !== undefined)
-                        tuple.cells[pair.input] = { entrant: false, value: path };
-                      onFile(
-                        { table: 0, row: pair.row, input: pair.input },
-                        path,
-                        pair.file,
-                      );
-                    }
+                    onChange(axes.map((axis, index) => (index === 0 ? next : axis)));
+                    for (const pair of pairing.pairs)
+                      onFile({ table: 0, row: pair.row, input: pair.input }, pair.file);
                     setPending([]);
                   }}
                 >
@@ -287,36 +258,7 @@ export function RunsCard({
               </div>
             </div>
           )}
-          {first !== undefined && first.inputs.length > 0 && table(first, 0)}
-          <details
-            open={expanded}
-            onToggle={(event) => setExpanded(event.currentTarget.open)}
-          >
-            <summary
-              onClick={(event) => {
-                event.preventDefault();
-                const open = !expanded;
-                setExpanded(open);
-                if (open && axes.length < 2 && !disabled)
-                  onChange([...axes, { inputs: [], tuples: [emptyTuple([])] }]);
-              }}
-            >
-              Run each row more than once, with different settings
-            </summary>
-            <div className={classes.secondTable}>
-              <h3 className={classes.itemTitle}>Each run also gets one of these</h3>
-              <BodyText>Every row above runs once with every row here.</BodyText>
-              {axes.slice(1).some((axis) => axis.inputs.length > 0) ? (
-                axes
-                  .slice(1)
-                  .map((axis, index) =>
-                    axis.inputs.length === 0 ? null : table(axis, index + 1),
-                  )
-              ) : (
-                <BodyText>Choose its inputs on the Inputs card.</BodyText>
-              )}
-            </div>
-          </details>
+          {table(first, 0)}
         </>
       )}
     </BuildCard>
@@ -329,7 +271,6 @@ function RunsRow({
   row,
   tuple,
   axis,
-  axes,
   declared,
   staged,
   disabled,
@@ -343,7 +284,6 @@ function RunsRow({
   row: number;
   tuple: TupleValues;
   axis: AxisValues;
-  axes: AxisValues[];
   declared: readonly DeclaredInput[];
   staged: StagedInput[];
   disabled: boolean;
@@ -387,13 +327,7 @@ function RunsRow({
                 onChange={(cell) =>
                   onChange({ ...tuple, cells: { ...tuple.cells, [id]: cell } })
                 }
-                onFile={(file) =>
-                  onFile(
-                    { table, row, input: id },
-                    cellPath(axes, table, row, id),
-                    file,
-                  )
-                }
+                onFile={(file) => onFile({ table, row, input: id }, file)}
                 onSize={() => setSizeOpen(true)}
                 onDiscard={onDiscard}
               />

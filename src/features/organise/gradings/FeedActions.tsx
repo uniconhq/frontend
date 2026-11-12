@@ -105,16 +105,11 @@ function Consequence({ asking }: { asking: Asking }) {
       <>
         {asking.task === '' && <BodyText>Choose the task to rejudge.</BodyText>}
         <BodyText>
-          Every submission to {task} runs again on the task as it is now, its latest
-          publication. For when its runs, its workflow or its scoring changed. To grade
-          one submission again on the version it was graded on, retry it instead.
+          Every submission to {task} is graded again on the task as it is now. Use it
+          after you change the task.
         </BodyText>
         <BodyText tone="secondary">
-          Each new result replaces the one before, which stays in the list, marked as
-          replaced. Until each new run finishes, entrants and the leaderboards keep
-          seeing the current results. A submission still being graded on an older
-          version of the task is stopped first; one already running on the latest is
-          left to finish.
+          Everyone keeps seeing the old results until the new ones are ready.
         </BodyText>
       </>
     );

@@ -40,7 +40,7 @@ function inFolder(name: string, text: string): File {
 }
 
 describe('a file chosen for a setting', () => {
-  it('goes under the input’s own folder', async () => {
+  it('is saved under its own name', async () => {
     taskWithFiles();
     const staged = await stageInputFiles(
       PLACE,
@@ -48,11 +48,11 @@ describe('a file chosen for a setting', () => {
       [new File(['print(1)\n'], 'checker.py')],
       '',
     );
-    expect(staged.value).toBe('checker/checker.py');
-    expect(staged.planned.map((change) => change.path)).toEqual(['checker/checker.py']);
+    expect(staged.value).toBe('checker.py');
+    expect(staged.planned.map((change) => change.path)).toEqual(['checker.py']);
   });
 
-  it('puts a folder’s files under the input’s own folder, by their place inside it', async () => {
+  it('keeps a folder’s own name and its files’ places inside it', async () => {
     taskWithFiles();
     const folder = await stageInputFiles(
       PLACE,
@@ -60,18 +60,16 @@ describe('a file chosen for a setting', () => {
       [inFolder('runner.py', 'run\n')],
       '',
     );
-    expect(folder.value).toBe('data/');
-    expect(folder.planned.map((change) => change.path)).toEqual(['data/runner.py']);
+    expect(folder.value).toBe('mine/');
+    expect(folder.planned.map((change) => change.path)).toEqual(['mine/runner.py']);
   });
 });
 
 describe('an upload a setting would write', () => {
-  it('is a file right in a file setting’s own folder, and never one for a folder setting', () => {
+  it('is a single file for a file setting, and never one for a folder setting', () => {
     const checker = declared('checker', 'file');
-    expect(uploadFits(checker, 'checker/big.bin')).toBe(true);
-    expect(uploadFits(checker, 'checker/deep/big.bin')).toBe(false);
-    expect(uploadFits(checker, 'checker/')).toBe(false);
-    expect(uploadFits(checker, 'checkers/big.bin')).toBe(false);
-    expect(uploadFits(declared('data', 'folder'), 'data/big.bin')).toBe(false);
+    expect(uploadFits(checker, 'big.bin')).toBe(true);
+    expect(uploadFits(checker, 'checker/big.bin')).toBe(false);
+    expect(uploadFits(declared('data', 'folder'), 'big.bin')).toBe(false);
   });
 });

@@ -293,7 +293,6 @@ function Manage({
           name="Invite someone into it"
           className={classes.inline}
           label="Invite someone into it"
-          description="A username, or an email address for someone without an account. They join once they accept."
           size="xs"
           variant="secondary"
           loading={change.pending === 'invite'}

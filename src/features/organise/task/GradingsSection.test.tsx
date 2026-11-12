@@ -278,7 +278,7 @@ describe("the task's gradings", () => {
       name: 'Grade every submission to B · sum again?',
     });
     expect(dialog).toHaveTextContent(
-      'Every submission to B · sum runs again on the task as it is now, its latest publication.',
+      'Every submission to B · sum is graded again on the task as it is now.',
     );
     expect(rejudged).toBe(0);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
@@ -412,7 +412,10 @@ describe("the organisers' scored view of a submission", () => {
     expect(asked[0]?.get('entrant')).toBe('e-ada');
     const main = within(view).getByRole('region', { name: 'Group main' });
     expect(main).toHaveTextContent('Test 1');
-    expect(main).toHaveTextContent('Run time (ms) 12');
+    expect(
+      within(main).getByRole('columnheader', { name: 'Run time (ms)' }),
+    ).toBeVisible();
+    expect(within(main).getByRole('cell', { name: '12' })).toBeVisible();
     expect(within(view).getByLabelText('Values')).toHaveTextContent(
       'score100 After the deadline',
     );

@@ -8,18 +8,12 @@ import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { PageLink } from '@/ui/PageLink';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { TextInput } from '@/ui/TextInput';
-import { Group, Stack } from '@/ui/layout';
+import { Group } from '@/ui/layout';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_SECTIONS, contestSectionPath, sectionOf } from '@/lib/sections';
 import { readContest, writeContest, type ContestValues } from '../forms/contest-values';
 import { Fieldset, NumberField, TimeField } from '../forms/fields';
-import {
-  approvesAtOnce,
-  DEFAULT_WAYS,
-  newSignup,
-  registrationSentence,
-  type WayValues,
-} from '../forms/ways';
+import { approvesAtOnce, DEFAULT_WAYS, newSignup, type WayValues } from '../forms/ways';
 import { numberProblem } from '../forms/values';
 import type { ValuesFormProps } from '../forms/ValuesForm';
 import { InvitesSection } from '../invites/InvitesSection';
@@ -44,26 +38,26 @@ function ticksOf(way: WayValues): Ticks {
 }
 
 /** The first way a new contest starts from, by what its organiser picks. */
-const STARTERS: { label: string; says: string; ways: WayValues[] }[] = [
+const STARTERS: { label: string; ways: WayValues[]; ticks: Ticks }[] = [
   {
     label: 'Anyone can sign up',
-    says: 'Anyone with an account registers themselves.',
     ways: [newSignup()],
+    ticks: { code: false, domains: false },
   },
   {
-    label: 'Invite only',
-    says: 'Only the people you invite can register.',
+    label: 'Organiser invite',
     ways: [{ kind: 'invite', approval: '' }],
+    ticks: { code: false, domains: false },
   },
   {
-    label: 'With a code',
-    says: 'People register with a code you give them.',
+    label: 'Invitation code',
     ways: [newSignup({ code: '' })],
+    ticks: { code: true, domains: false },
   },
   {
-    label: 'Students at a domain',
-    says: 'People with an email address at your domain, approved straight away.',
-    ways: [newSignup({ name: 'Students', approval: 'auto' })],
+    label: 'Email domain',
+    ways: [newSignup()],
+    ticks: { code: false, domains: true },
   },
 ];
 
@@ -323,54 +317,29 @@ function EntryForm({
 
   return (
     <div className={forms.form} role="group" aria-label="How people enter">
-      <div className={shared.panel} role="status" aria-label="What it adds up to">
-        <BodyText>{registrationSentence(values)}</BodyText>
-      </div>
       {signups && values.visibility === 'hidden' && (
         <div className={shared.panel} role="note">
           <BodyText>
-            Only its entrants and organisers see this contest, so nobody can find it to
-            sign up: only the people you invite can register. Let anyone signed in see
-            it from the contest’s status, or invite people instead.
+            Only entrants and organisers can see this contest, so nobody can find it to
+            sign up. Change who sees it in Settings, or invite people instead.
           </BodyText>
         </div>
       )}
 
-      <Fieldset
-        legend="Ways in"
-        note="People can register through any one of these ways, as long as they meet everything that way asks."
-      >
+      <Fieldset legend="Ways in">
         {ways === null ? (
-          <div className={shared.stack}>
-            <BodyText>
-              Until you choose, anyone with an account can sign up, and an organiser
-              approves each one. Start from one of these, then change it or add more:
-            </BodyText>
-            <div className={classes.starters} role="group" aria-label="Start from">
-              {STARTERS.map((starter) => (
-                <Stack key={starter.label} gap={6} align="flex-start">
-                  <Button
-                    variant="secondary"
-                    disabled={locked}
-                    onClick={() =>
-                      setWays(
-                        starter.ways,
-                        starter.ways.map((way) =>
-                          starter.label === 'With a code'
-                            ? { code: true, domains: false }
-                            : starter.label === 'Students at a domain'
-                              ? { code: false, domains: true }
-                              : ticksOf(way),
-                        ),
-                      )
-                    }
-                  >
-                    {starter.label}
-                  </Button>
-                  <BodyText tone="secondary">{starter.says}</BodyText>
-                </Stack>
-              ))}
-            </div>
+          // Nothing chosen is the forge's default, anyone signing up.
+          <div className={classes.starters} role="group" aria-label="Start from">
+            {STARTERS.map((starter, at) => (
+              <Button
+                key={starter.label}
+                variant={at === 0 ? 'primary' : 'secondary'}
+                disabled={locked}
+                onClick={() => setWays(starter.ways, [starter.ticks])}
+              >
+                {starter.label}
+              </Button>
+            ))}
           </div>
         ) : ways.length === 0 ? (
           <div className={shared.panel} role="alert">
@@ -513,11 +482,10 @@ function EntryForm({
       <Fieldset legend="Limit">
         <FieldBox name="capacity">
           <NumberField
-            label="Most entrants"
+            label="Max number of entrants"
             value={values.capacity}
             onChange={(capacity) => set('capacity', capacity)}
-            placeholder="Default"
-            hint="Entrants waiting for approval count towards it."
+            placeholder="No limit"
             disabled={locked}
           />
         </FieldBox>

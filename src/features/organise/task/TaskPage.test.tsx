@@ -66,22 +66,25 @@ describe('the task page', () => {
     renderApp(TASK);
 
     const status = await screen.findByLabelText('Where the task stands');
-    expect(status).toHaveTextContent('Published');
+    expect(await screen.findByText('Published')).toBeVisible();
     expect(status).toHaveTextContent(
       `Entrants are graded on publication 2, saved ${at('2026-09-21T10:00:00Z')}.`,
     );
   });
 
-  it('says under its title where it stands in its contest, which a manager changes from there', async () => {
+  it('says where it stands in its contest, which a manager changes on its Settings page', async () => {
     server.use(signedIn, taskState, publicationList, standingList, ...repoFiles);
     const user = userEvent.setup();
     renderApp(TASK);
 
     const status = await screen.findByLabelText('Where the task stands');
-    const line = await within(status).findByRole('button', {
+    expect(await within(status).findByText('In Spring:')).toBeVisible();
+    expect(within(status).queryByRole('button', { name: /^Change/ })).toBeNull();
+
+    renderApp(`${TASK}/settings`);
+    const line = await screen.findByRole('button', {
       name: 'Change B · sum in this contest',
     });
-    expect(within(status).getByText('In Spring:')).toBeVisible();
     expect(line).toHaveTextContent('open for the whole contest·Change');
     await user.click(line);
     const dialog = await screen.findByRole('dialog', {
@@ -125,7 +128,7 @@ describe('the task page', () => {
     await waitFor(() => expect(reads).toBeGreaterThan(before));
   });
 
-  it('goes back to the contest once the task is removed from its own page, reading the task no more', async () => {
+  it('goes back to the contest once the task is removed from its Settings page, reading the task no more', async () => {
     const afterRemoval: string[] = [];
     let removed = false;
     server.use(
@@ -147,11 +150,10 @@ describe('the task page', () => {
       }),
     );
     const user = userEvent.setup();
-    renderApp(TASK);
+    renderApp(`${TASK}/settings`);
 
-    const status = await screen.findByLabelText('Where the task stands');
     await user.click(
-      await within(status).findByRole('button', {
+      await screen.findByRole('button', {
         name: 'Change B · sum in this contest',
       }),
     );
@@ -199,7 +201,7 @@ describe('the task page', () => {
     renderApp(TASK);
 
     const status = await screen.findByLabelText('Where the task stands');
-    expect(status).toHaveTextContent('Last save has problems');
+    expect(await screen.findByText('Last save has problems')).toBeVisible();
     expect(status).toHaveTextContent(
       'The last save has problems, so it was kept as a draft and entrants are graded as before.',
     );
@@ -282,6 +284,7 @@ describe('the task page', () => {
           inputs: [],
           yanked: null,
           text_values: null,
+          limits: { max: 50, count: 1, per: 30 },
         } satisfies WorkflowForm),
       ),
     );
@@ -353,7 +356,19 @@ describe('the task page', () => {
       within(running)
         .getAllByRole('heading', { level: 2 })
         .map((heading) => within(heading).getByRole('link').getAttribute('href')),
-    ).toEqual(TASK_SECTIONS.map((section) => `${TASK}/${section.segment}`));
+    ).toEqual(
+      TASK_SECTIONS.filter((section) => section.card === 'grid').map(
+        (section) => `${TASK}/${section.segment}`,
+      ),
+    );
+    expect(
+      within(await screen.findByRole('region', { name: 'Settings' })).getByRole(
+        'link',
+        {
+          name: 'Settings',
+        },
+      ),
+    ).toHaveAttribute('href', `${TASK}/settings`);
     expect(
       await within(screen.getByRole('region', { name: 'Publications' })).findByText(
         /^Entrants are graded on publication 2/,
@@ -415,7 +430,7 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
     expect(items).toEqual([
       ['Done', 'Statement'],
       ['Done', 'Workflow'],
-      ['Not done', 'Inputs: Time limit (seconds) needs a value'],
+      ['To do', 'Inputs: Time limit (seconds) needs a value'],
       ['Done', 'Runs: 1'],
     ]);
     expect(within(row).getByRole('link', { name: /^Inputs/ })).toHaveAttribute(
@@ -466,7 +481,7 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
     );
     expect(
       within(within(row).getAllByRole('listitem')[0]!).getByRole('img'),
-    ).toHaveAttribute('aria-label', 'Not done');
+    ).toHaveAttribute('aria-label', 'To do');
   });
 
   it('says who saved the publication entrants are graded on', async () => {
@@ -537,7 +552,7 @@ describe('releasing results', () => {
         });
       }),
     );
-    renderApp(TASK);
+    renderApp(`${TASK}/settings`);
     await user.click(await screen.findByRole('button', { name: 'Release results' }));
     expect(await screen.findByText('Score becomes visible to entrants.')).toBeVisible();
     const dialog = screen.getByRole('dialog');
@@ -582,7 +597,7 @@ describe('releasing results', () => {
       }),
     );
     const user = userEvent.setup();
-    renderApp(TASK);
+    renderApp(`${TASK}/settings`);
     await user.click(await screen.findByRole('button', { name: 'Release results' }));
     expect(
       await screen.findByRole('list', { name: 'Results history' }),

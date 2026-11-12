@@ -218,7 +218,6 @@ function FilterBar({
           />
           <Checkbox
             label="Latest attempts only"
-            description="Each submission's latest attempt, without the earlier ones."
             checked={filters.latest !== null}
             onChange={(checked) => set('latest', checked ? 'true' : '')}
           />

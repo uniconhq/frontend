@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router';
 import { Card } from '@/ui/Card';
 import { PageLink } from '@/ui/PageLink';
 import { useContestParams } from '@/lib/route-params';
@@ -22,6 +23,8 @@ import { ContestClarifications } from '../threads/Clarifications';
 export function ContestSettingsPage() {
   const { org, contest } = useContestParams();
   const may = usePlaceMay({ kind: 'contest', org, contest });
+  // Closed unless a link leads to it, such as one to mend the settings.
+  const { hash } = useLocation();
   return (
     <SectionPage
       place={{ kind: 'contest', org, contest }}
@@ -33,9 +36,12 @@ export function ContestSettingsPage() {
         <ContestSettings org={org} contest={contest} />
       </Card>
       <section aria-label="The settings as stored" id={STORED}>
-        <Card>
-          <StoredSettings place={{ kind: 'contest', org, contest }} />
-        </Card>
+        <details open={hash === `#${STORED}`}>
+          <summary>The settings as stored</summary>
+          <Card>
+            <StoredSettings place={{ kind: 'contest', org, contest }} />
+          </Card>
+        </details>
       </section>
     </SectionPage>
   );

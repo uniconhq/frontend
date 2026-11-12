@@ -70,6 +70,7 @@ import {
 } from './scoring-model';
 import { ShowPicker, type ShowRow } from './ShowPicker';
 import { ShowPreview } from './ShowPreview';
+import { useShowPreview } from './show-preview';
 import { useDraftRuns } from './draft-runs';
 import { FIRST_NOT_PASSED } from '@/ui/scored/scored-text';
 import { Group } from '@/ui/layout';
@@ -102,7 +103,6 @@ const WORKFLOW_UNREAD =
  */
 export function ScoringCard({
   place,
-  elsewhere,
   values,
   titles,
   workflowValues,
@@ -115,8 +115,6 @@ export function ScoringCard({
   onProblems,
 }: {
   place: TaskPlace;
-  /** The draft changes more than show, so the preview says to publish first. */
-  elsewhere: boolean;
   values: TaskValues;
   /** Each input's title from the workflow, by its name. */
   titles: ReadonlyMap<string, string>;
@@ -173,6 +171,10 @@ export function ScoringCard({
   // What a run gives that the table above does not show: each input a table
   // repeats, or every column while there is no table.
   const also = draft.runs === null ? [] : rows.length === 0 ? readable : repeated;
+  const [moment, setMoment] = useState<Moment>('always');
+  const preview = useShowPreview(place, values.show, moment);
+  // Forge's made-up result of each run, by field name, in the runs' order.
+  const sample = preview.state === 'ready' ? preview.data.sample : [];
   const [chosen, setChosen] = useState<string | null>(null);
   // `show` as read, so hiding what was shown always is warned of.
   const [savedShow] = useState(values.show);
@@ -292,15 +294,15 @@ export function ScoringCard({
     <BuildCard
       id="scoring"
       title="Scoring"
-      line="How a submission's runs become its result: which runs count together, and the numbers worked out from them."
+      line="How a submission's score is worked out from its runs."
     >
       {blocks.isError && <BodyText>{BLOCKS_UNLOADED}</BodyText>}
       {(workflowRead === 'failed' || outputTypes.isError) && (
         <BodyText>{WORKFLOW_UNREAD}</BodyText>
       )}
       <CardPart
-        title="What one submission gives"
-        line="One submission runs once on each row. The numbers here are made up, to show the shape."
+        title="A sample result"
+        line="Each row is one run, from a row of the Runs table. The numbers are made up."
       >
         {draft.failed && draft.runs === null ? (
           <BodyText>The runs could not be read.</BodyText>
@@ -312,7 +314,7 @@ export function ScoringCard({
           </BodyText>
         ) : (
           <div className={tableClasses.scroll}>
-            <table className={classes.runs} aria-label="What one submission gives">
+            <table className={classes.runs} aria-label="A sample result">
               <thead>
                 <tr>
                   <th>Run</th>
@@ -331,8 +333,8 @@ export function ScoringCard({
                 {rows.map((row, index) => (
                   <tr key={row.id}>
                     <th>{row.title}</th>
-                    {columns.map((column, at) => (
-                      <td key={column.name}>{example(column, index, at)}</td>
+                    {columns.map((column) => (
+                      <td key={column.name}>{sample[index]?.[column.name] ?? ''}</td>
                     ))}
                   </tr>
                 ))}
@@ -340,11 +342,19 @@ export function ScoringCard({
             </table>
           </div>
         )}
-        <BodyText size="sm">
-          {also.length > 0 &&
-            `Every run also gives ${listed(also.map((column) => column.title ?? titles.get(column.name) ?? column.name))}. `}
-          A value can also read {listed(FACTS.map((fact) => fact.title.toLowerCase()))}.
-        </BodyText>
+        {also.length > 0 && (
+          <BodyText size="sm">
+            {`Every run also gives ${listed(also.map((column) => column.title ?? titles.get(column.name) ?? column.name))}.`}
+          </BodyText>
+        )}
+        <BodyText size="sm">A value can also read:</BodyText>
+        <ul className={classes.facts} aria-label="What a value can also read">
+          {FACTS.map((fact) => (
+            <li key={fact.name}>
+              <code>{fact.name}</code>: {fact.line}
+            </li>
+          ))}
+        </ul>
       </CardPart>
       <CardPart
         title="Groups"
@@ -608,19 +618,12 @@ export function ScoringCard({
       </CardPart>
       <CardPart
         title="Preview"
-        line="An entrant's page as the grid leaves it, at the moment picked, before any submission or with one of theirs."
+        line="What an entrant sees of the sample result, at each moment."
       >
-        <ShowPreview place={place} show={values.show} elsewhere={elsewhere} />
+        <ShowPreview moment={moment} onMoment={setMoment} preview={preview} />
       </CardPart>
     </BuildCard>
   );
-}
-
-function example(column: Column, index: number, at: number): string {
-  if (column.name === 'passed') return index % 2 === 0 ? '1' : '0';
-  if (column.name === 'verdict') return index % 2 === 0 ? 'accepted' : 'wrong_answer';
-  if (column.kind === 'text') return 'text';
-  return String((index + 1) * (at + 1) * 10);
 }
 
 function editText(
@@ -727,11 +730,6 @@ function Groups({
           )}
           {tables.map((table, tableIndex) => (
             <tbody key={tableIndex}>
-              {tables.length > 1 && (
-                <tr>
-                  <th colSpan={groups.length + 2}>{table.inputs.join(', ')}</th>
-                </tr>
-              )}
               {table.tuples.map((tuple, index) => {
                 const name = runName(tuple, [table]);
                 const axis = {
@@ -1004,7 +1002,7 @@ function flowBoxes({
         ...(runEntries(show).includes(FIRST_NOT_PASSED)
           ? [
               {
-                ...entry(FIRST_NOT_PASSED, 'The first run not passed', '1 run'),
+                ...entry(FIRST_NOT_PASSED, 'The first failed run', '1 run'),
                 pin: false,
               },
             ]

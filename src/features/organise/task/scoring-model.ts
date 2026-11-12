@@ -64,8 +64,8 @@ export const FACTS: { name: string; title: string; line: string }[] = [
   },
   {
     name: 'seconds',
-    title: 'Seconds taken',
-    line: 'How many seconds the submission took',
+    title: 'Seconds since the start',
+    line: 'How many seconds after the contest started it came in',
   },
   {
     name: 'compiled',

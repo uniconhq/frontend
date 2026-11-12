@@ -842,8 +842,16 @@ describe('a submission opened from the list', () => {
       name: 'Group samples',
     });
     expect(within(samples).getAllByText('ACCEPTED')).toHaveLength(2);
-    expect(samples).toHaveTextContent('Run time (ms) 12');
-    expect(samples).toHaveTextContent(`Memory used (KB) ${formatExact('2048')}`);
+    expect(
+      within(samples).getByRole('columnheader', { name: 'Run time (ms)' }),
+    ).toBeVisible();
+    expect(within(samples).getByRole('cell', { name: '12' })).toBeVisible();
+    expect(
+      within(samples).getByRole('columnheader', { name: 'Memory used (KB)' }),
+    ).toBeVisible();
+    expect(
+      within(samples).getAllByRole('cell', { name: formatExact('2048') }),
+    ).not.toHaveLength(0);
     expect(detail).not.toHaveTextContent(/points/);
 
     await user.click(within(detail).getByRole('button', { name: 'Show log' }));

@@ -347,7 +347,7 @@ function InviteToTeam({
       description={
         full
           ? `Your team is full: a team holds at most ${String(most)}, counting the people invited.`
-          : 'A username for someone with an account, an email address for anyone.'
+          : undefined
       }
       required
       disabled={full}

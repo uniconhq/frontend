@@ -16,7 +16,6 @@ import {
   emptyTuple,
   heldTheOtherWay,
   readTask,
-  settled,
   withoutInput,
   writeTask,
   type Give,
@@ -47,7 +46,7 @@ import { useDraftRuns } from './draft-runs';
 import { taskPlace, taskPlaceOf } from './places';
 import { SaveBar } from './SaveBar';
 import { RunsCard } from './RunsCard';
-import { ChecksCard } from './ChecksCard';
+import { ChecksCard, type CheckFiles } from './ChecksCard';
 import { ScoringCard, type WorkflowRead } from './ScoringCard';
 import { SubmissionsCard } from './SubmissionsCard';
 import { WorkflowCard } from './WorkflowCard';
@@ -172,12 +171,10 @@ function BuildForm({
       axes:
         picked === saved
           ? read.values.axes
-          : settled(
-              before.axes.map((axis) =>
-                axis.inputs
-                  .filter((id) => !declared.inputs.some((found) => found.id === id))
-                  .reduce(withoutInput, axis),
-              ),
+          : before.axes.map((axis) =>
+              axis.inputs
+                .filter((id) => !declared.inputs.some((found) => found.id === id))
+                .reduce(withoutInput, axis),
             ),
     }));
   }
@@ -206,12 +203,8 @@ function BuildForm({
         ...axis,
         inputs: axis.inputs.filter((item) => item !== id),
       }));
-      if (give !== 'per-run') return { ...before, inputs, axes: settled(cleared) };
-      const axes = cleared.length === 0 ? [{ inputs: [], tuples: [] }] : cleared;
-      const emptyAt = axes.findIndex((axis) => axis.inputs.length === 0);
-      const target = emptyAt >= 0 ? emptyAt : 0;
-      const first = axes[target];
-      if (first === undefined) return { ...before, inputs };
+      if (give !== 'per-run') return { ...before, inputs, axes: cleared };
+      const first = cleared[0] ?? { inputs: [], tuples: [] };
       const tuples =
         first.tuples.length === 0
           ? [emptyTuple([id])]
@@ -222,29 +215,11 @@ function BuildForm({
                 [id]: tuple.cells[id] ?? { entrant: false, value: '' },
               },
             }));
-      axes[target] = { inputs: [...first.inputs, id], tuples };
-      return { ...before, inputs, axes: settled(axes) };
-    });
-  const moveAxis = (id: string, index: number) =>
-    setValues((before) => {
-      const axes = before.axes.map((axis) => ({
-        ...axis,
-        inputs: axis.inputs.filter((item) => item !== id),
-      }));
-      while (axes.length <= index) axes.push({ inputs: [], tuples: [emptyTuple([])] });
-      const axis = axes[index];
-      if (axis === undefined) return before;
-      const tuples = (axis.tuples.length === 0 ? [emptyTuple([id])] : axis.tuples).map(
-        (tuple) => ({
-          ...tuple,
-          cells: {
-            ...tuple.cells,
-            [id]: tuple.cells[id] ?? { entrant: false, value: '' },
-          },
-        }),
-      );
-      axes[index] = { inputs: [...axis.inputs, id], tuples };
-      return { ...before, axes: settled(axes) };
+      return {
+        ...before,
+        inputs,
+        axes: [{ inputs: [...first.inputs, id], tuples }, ...cleared.slice(1)],
+      };
     });
   const [reading, setReading] = useState<unknown>(null);
   // A chosen file is read before it is part of the save. Until that read
@@ -255,8 +230,12 @@ function BuildForm({
     setPendingFiles((count) => count + 1);
     void work.finally(() => setPendingFiles((count) => count - 1));
   };
-  /** A setting's change, once read, waits for the save, and the setting names it. */
-  const stageSetting = (work: Promise<StagedInput>, was: string) => {
+  /** A file's change, once read, waits for the save, and `apply` names it. */
+  const stage = (
+    work: Promise<StagedInput>,
+    was: string,
+    apply: (change: StagedInput) => void,
+  ) => {
     setReading(null);
     stageFile(
       work
@@ -268,10 +247,23 @@ function BuildForm({
               was: before.find((each) => each.id === change.id)?.was ?? was,
             },
           ]);
-          setInput(change.id, { value: change.value });
+          apply(change);
         })
         .catch((error: unknown) => setReading(error)),
     );
+  };
+  const stageSetting = (work: Promise<StagedInput>, was: string) =>
+    stage(work, was, (change) => setInput(change.id, { value: change.value }));
+  /** A check's file is staged by its path, as a run's is. */
+  const checkFiles: CheckFiles = {
+    staged: inputFiles,
+    stage: (work, was, apply) =>
+      stage(
+        work.then((change) => ({ ...change, id: change.value })),
+        was,
+        (change) => apply(change.value),
+      ),
+    unstage: (id) => setInputFiles((before) => before.filter((each) => each.id !== id)),
   };
   /** Files chosen for a setting wait for the save, which writes them and points the setting at them. */
   const files: InputFiles = {
@@ -296,14 +288,6 @@ function BuildForm({
     inputFiles.map((change) => change.id),
   );
   const changed = lines.length > 0 || values.inputs.some(heldTheOtherWay);
-  // What the preview cannot show until it is published: any change but show's.
-  const elsewhere =
-    changeLines(
-      read.values,
-      { ...values, show: read.values.show },
-      titles,
-      inputFiles.map((change) => change.id),
-    ).length > 0 || values.inputs.some(heldTheOtherWay);
   // A save's answer is about that save: once something is changed again, it
   // goes, rather than standing in the bar beside changes it does not cover.
   // The cards read the task afresh once a save is through, so an answer that
@@ -417,14 +401,8 @@ function BuildForm({
                 : 'The workflow chosen cannot be read.'
         }
         inputs={values.inputs}
-        axisCount={Math.max(values.axes.length, 1)}
-        axisOf={(id) => {
-          const index = values.axes.findIndex((axis) => axis.inputs.includes(id));
-          return index < 0 ? 0 : index;
-        }}
         onChange={setInput}
         onGive={giveInput}
-        onAxis={moveAxis}
         onRemove={(id) =>
           set({ inputs: values.inputs.filter((input) => input.id !== id) })
         }
@@ -443,11 +421,16 @@ function BuildForm({
         onDiscard={(path) =>
           setInputFiles((before) => before.filter((file) => file.value !== path))
         }
-        onFile={({ table: axis, row, input: id }, path, file) => {
+        onFile={({ table: axis, row, input: id }, file) => {
           setReading(null);
+          const path = file.name;
           const was = path;
           stageFile(
-            stageRunFile(place, path, file, '')
+            stageRunFile(
+              place,
+              file,
+              values.axes[axis]?.tuples[row]?.cells[id]?.value ?? '',
+            )
               .then((change) => {
                 setInputFiles((before) => [
                   ...before.filter((each) => each.id !== change.id),
@@ -486,7 +469,6 @@ function BuildForm({
         <>
           <ScoringCard
             place={place}
-            elsewhere={elsewhere}
             values={values}
             titles={titles}
             workflowValues={workflowValues ?? null}
@@ -501,13 +483,29 @@ function BuildForm({
           <ChecksCard
             place={place}
             values={values}
-            disabled={disabled}
+            declared={declared?.inputs ?? []}
+            files={checkFiles}
+            disabled={disabled || pendingFiles > 0}
             onChange={(checks) => set({ checks })}
+            onSubmit={(key, input, next) =>
+              setValues((before) => ({
+                ...before,
+                checks: before.checks.map((check) =>
+                  check.key === key
+                    ? {
+                        ...check,
+                        submit: { ...check.submit, [input]: next(check.submit[input]) },
+                      }
+                    : check,
+                ),
+              }))
+            }
           />
         </>
       )}
       <SubmissionsCard
         values={values}
+        limits={form?.limits ?? null}
         admin={admin}
         disabled={disabled}
         onChange={set}

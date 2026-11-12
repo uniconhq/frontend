@@ -13,7 +13,8 @@ import { ShownValue } from '@/ui/number/ShownValue';
 import { RESULTS_AFTER } from '@/ui/number/words';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { formatDateTime } from '@/lib/time';
-import { entryTitle, groupsOf, reportLabel, runTitle } from './scored-text';
+import { groupsOf, reportLabel, runTitle, shownPath, tupleLine } from './scored-text';
+import { RunsTable, type RunColumn } from './RunsTable';
 import { RunInputs, ShownInputs, type ReadFiles } from './ShownInputs';
 import classes from './scored.module.css';
 
@@ -95,30 +96,27 @@ function OpenText({
   );
 }
 
-function RunRow({
+/** Whether a run shows any of its inputs: a title, a value or a file. */
+function hasInputs(run: RunShown): boolean {
+  return (
+    tupleLine(run.tuples) !== '' ||
+    run.tuples.some((tuple) =>
+      Object.values(tuple.key).some((value) => shownPath(value) !== null),
+    )
+  );
+}
+
+/** The texts a run shows, each opened by a button. */
+function RunTexts({
   run,
   readText,
-  readFiles,
 }: {
   run: RunShown;
   readText?: (ask: TextAsk) => Promise<string>;
-  readFiles?: ReadFiles;
 }) {
   const ask = { group: run.group, place: run.place };
   return (
-    <Group gap="8px 14px" align="baseline">
-      <BodyText>{runTitle(run)}</BodyText>
-      <RunInputs run={run} readFiles={readFiles} />
-      {run.verdict !== null && <VerdictBadge verdict={run.verdict} />}
-      {run.passed !== null && (
-        <BodyText>{run.passed === 1 ? 'Passed' : 'Not passed'}</BodyText>
-      )}
-      {run.dropped && <BodyText tone="secondary">Dropped</BodyText>}
-      {run.reports.map((report, index) => (
-        <span key={index}>
-          {reportLabel(report.title, report.unit)} <ShownValue number={report.number} />
-        </span>
-      ))}
+    <Group gap={6}>
       {Object.entries(run.texts).map(([name, ref]) => (
         <OpenText
           key={name}
@@ -153,6 +151,79 @@ function RunRow({
       )}
     </Group>
   );
+}
+
+/** The columns a group's runs fill: only those some run of it shows. */
+function runColumns(
+  runs: RunShown[],
+  readText?: (ask: TextAsk) => Promise<string>,
+  readFiles?: ReadFiles,
+): RunColumn<RunShown>[] {
+  const some = (test: (run: RunShown) => boolean) => runs.some(test);
+  const reports = [
+    ...new Set(
+      runs.flatMap((run) =>
+        run.reports.map((each) => reportLabel(each.title, each.unit)),
+      ),
+    ),
+  ];
+  return [
+    {
+      title: 'Run',
+      cell: (run) => (
+        <>
+          {runTitle(run)}
+          {run.dropped && <BodyText tone="secondary">Dropped</BodyText>}
+        </>
+      ),
+    },
+    ...(some(hasInputs)
+      ? [
+          {
+            title: 'Input',
+            cell: (run: RunShown) => <RunInputs run={run} readFiles={readFiles} />,
+          },
+        ]
+      : []),
+    ...(some((run) => run.verdict !== null)
+      ? [
+          {
+            title: 'Verdict',
+            cell: (run: RunShown) =>
+              run.verdict === null ? null : <VerdictBadge verdict={run.verdict} />,
+          },
+        ]
+      : []),
+    ...(some((run) => run.passed !== null)
+      ? [
+          {
+            title: 'Passed',
+            cell: (run: RunShown) =>
+              run.passed === null ? null : run.passed === 1 ? 'Yes' : 'No',
+          },
+        ]
+      : []),
+    ...reports.map((title) => ({
+      title,
+      cell: (run: RunShown) => {
+        const found = run.reports.find(
+          (each) => reportLabel(each.title, each.unit) === title,
+        );
+        return found === undefined ? null : <ShownValue number={found.number} />;
+      },
+    })),
+    ...(some(
+      (run) =>
+        Object.keys(run.texts).length > 0 || run.label !== null || run.message !== null,
+    ) && readText !== undefined
+      ? [
+          {
+            title: 'Details',
+            cell: (run: RunShown) => <RunTexts run={run} readText={readText} />,
+          },
+        ]
+      : []),
+  ];
 }
 
 function OnceReports({
@@ -260,21 +331,13 @@ export function ScoredResult({
       )}
       <ShownInputs inputs={grading.inputs} readFiles={readFiles} />
       {groupsOf(runs).map((group) => (
-        <section
+        <RunsTable
           key={group.name}
-          aria-label={`Group ${entryTitle(group.name)}`}
-          className={classes.stack}
-        >
-          <BodyText>{entryTitle(group.name)}</BodyText>
-          {group.runs.map((run) => (
-            <RunRow
-              key={`${run.group}:${String(run.place)}`}
-              run={run}
-              readText={readText}
-              readFiles={readFiles}
-            />
-          ))}
-        </section>
+          group={group.name}
+          runs={group.runs}
+          columns={runColumns(group.runs, readText, readFiles)}
+          keyOf={(run) => String(run.place)}
+        />
       ))}
       <OnceReports once={once} readText={readText} />
       <Facts facts={factsOf(grading)} compiled={grading.compiled} />

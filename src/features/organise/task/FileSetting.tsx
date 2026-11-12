@@ -19,8 +19,8 @@ import classes from './task.module.css';
  * A setting of the task that is a file or a folder, such as a checker or a
  * data folder (M51): what it names now, with View to read it and Replace to
  * choose another, or a box to choose its file when it names none. A file
- * chosen waits for the task's save, which writes it under the input's own
- * folder and points the setting at it; Undo puts the setting back. A big
+ * chosen waits for the task's save, which writes it under its own name and
+ * points the setting at it; Undo puts the setting back. A big
  * file goes through the upload door at the save, as a test's does. A file
  * the door holds for this setting from a save that never happened is offered
  * as Use uploaded, which waits for the save as a file chosen does.

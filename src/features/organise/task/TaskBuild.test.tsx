@@ -85,6 +85,7 @@ const UNREAD: WorkflowForm = {
   newer: null,
   yanked: null,
   text_values: null,
+  limits: { max: 50, count: 1, per: 30 },
 };
 
 /** What unicon/checked@v1 declares, as the backend reads it. */
@@ -109,6 +110,7 @@ const CHECKED: WorkflowForm = {
   ],
   yanked: null,
   text_values: null,
+  limits: { max: 50, count: 1, per: 30 },
 };
 
 /** unicon/checked's file, which reports the fraction its checker gives a run. */
@@ -328,12 +330,12 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const { inputs } = await openTask();
     const typeOf = (name: string) =>
       within(within(inputs).getByRole('group', { name })).getByText(
-        /^(File|One of a list|Number|True or false|Text)$/,
+        /^(File|Selection|Number|Boolean|Text)$/,
       ).textContent;
     expect(typeOf('submission')).toBe('File');
-    expect(typeOf('language')).toBe('One of a list');
+    expect(typeOf('language')).toBe('Selection');
     expect(typeOf('Time limit (seconds)')).toBe('Number');
-    expect(typeOf('strict')).toBe('True or false');
+    expect(typeOf('strict')).toBe('Boolean');
     expect(typeOf('greeting')).toBe('Text');
     expect(within(inputs).queryByText(/^(enum|boolean)$/)).toBeNull();
   });
@@ -493,24 +495,22 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     await save();
 
     const body = await waitForSave(sent);
-    expect(written(body)['inputs']).toMatchObject({ checker: 'checker/checker.py' });
-    expect(body.changes.filter((change) => change.path.startsWith('checker/'))).toEqual(
-      [
-        {
-          path: 'checker/checker.py',
-          token: null,
-          content: btoa('print(1)\n'),
-          encoding: 'base64',
-          remove: false,
-        },
-        {
-          path: 'checker/checker.cpp',
-          token: 'token-checker',
-          remove: true,
-          encoding: 'utf-8',
-        },
-      ],
-    );
+    expect(written(body)['inputs']).toMatchObject({ checker: 'checker.py' });
+    expect(body.changes.filter((change) => change.path.startsWith('checker'))).toEqual([
+      {
+        path: 'checker.py',
+        token: null,
+        content: btoa('print(1)\n'),
+        encoding: 'base64',
+        remove: false,
+      },
+      {
+        path: 'checker/checker.cpp',
+        token: 'token-checker',
+        remove: true,
+        encoding: 'utf-8',
+      },
+    ]);
   });
 
   it('puts a setting’s file back as it was on Undo', async () => {
@@ -541,12 +541,12 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
         HttpResponse.json([
           {
             ...partTransfer('up-checker', 'stored'),
-            path: 'checker/big.bin',
+            path: 'big.bin',
             size: 300 * 1024,
           },
           // Not one the checker's box would write, nor one that has arrived whole.
           { ...partTransfer('up-tests', 'stored'), path: 'tests/big.bin' },
-          { ...partTransfer('up-open', 'open'), path: 'checker/open.bin' },
+          { ...partTransfer('up-open', 'open'), path: 'open.bin' },
         ]),
       ),
     );
@@ -581,25 +581,23 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     await save();
 
     const body = await waitForSave(sent);
-    expect(written(body)['inputs']).toMatchObject({ checker: 'checker/big.bin' });
+    expect(written(body)['inputs']).toMatchObject({ checker: 'big.bin' });
     // Written by the upload's id, so nothing is sent again.
-    expect(body.changes.filter((change) => change.path.startsWith('checker/'))).toEqual(
-      [
-        {
-          path: 'checker/big.bin',
-          token: null,
-          upload: 'up-checker',
-          encoding: 'utf-8',
-          remove: false,
-        },
-        {
-          path: 'checker/checker.cpp',
-          token: 'token-checker',
-          remove: true,
-          encoding: 'utf-8',
-        },
-      ],
-    );
+    expect(body.changes.filter((change) => change.path !== 'task.yaml')).toEqual([
+      {
+        path: 'big.bin',
+        token: null,
+        upload: 'up-checker',
+        encoding: 'utf-8',
+        remove: false,
+      },
+      {
+        path: 'checker/checker.cpp',
+        token: 'token-checker',
+        remove: true,
+        encoding: 'utf-8',
+      },
+    ]);
   });
 
   describe('a file chosen for a setting, through a change of workflow', () => {
@@ -649,12 +647,12 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       await save();
       const body = await waitForSave(sent);
       expect(written(body)['workflow']).toBe('unicon/checked@v3');
-      expect(written(body)['inputs']).toMatchObject({ checker: 'checker/checker.py' });
+      expect(written(body)['inputs']).toMatchObject({ checker: 'checker.py' });
       expect(
         body.changes
-          .filter((change) => change.path.startsWith('checker/'))
+          .filter((change) => change.path.startsWith('checker'))
           .map((change) => change.path),
-      ).toEqual(['checker/checker.py', 'checker/checker.cpp']);
+      ).toEqual(['checker.py', 'checker/checker.cpp']);
     });
 
     it('goes with the input when the new version does not have it', async () => {
@@ -684,7 +682,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       await save();
       const body = await waitForSave(sent);
       expect(
-        body.changes.filter((change) => change.path.startsWith('checker/')),
+        body.changes.filter((change) => change.path.startsWith('checker')),
       ).toEqual([]);
     });
   });
@@ -753,7 +751,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const run = await within(workflow).findByRole('group', { name: 'Step run' });
     await userEvent.click(within(run).getByRole('button', { name: /^run/ }));
     const drawer = await screen.findByRole('complementary', { name: 'Step run' });
-    expect(within(drawer).getByRole('textbox', { name: 'Name' })).toBeDisabled();
+    expect(within(drawer).getByRole('textbox', { name: 'Key' })).toBeDisabled();
     expect(within(drawer).queryByRole('button', { name: /^Remove/ })).toBeNull();
   });
 
@@ -1353,6 +1351,7 @@ function runForm(workflow: string, inputs: DeclaredInput[]): WorkflowForm {
     inputs,
     yanked: null,
     text_values: null,
+    limits: { max: 50, count: 1, per: 30 },
   };
 }
 
@@ -1383,7 +1382,7 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     await userEvent.click(within(language).getByRole('checkbox', { name: 'cpp' }));
     await userEvent.click(within(language).getByRole('checkbox', { name: 'python' }));
     await userEvent.selectOptions(
-      within(language).getByRole('combobox', { name: 'Chosen to start with' }),
+      within(language).getByRole('combobox', { name: 'Default' }),
       'cpp',
     );
     fill(fieldIn(inputs, 'time_limit', 'time_limit'), '2');
@@ -1428,13 +1427,13 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
           inputs: ['input', 'answer'],
           tuples: [
             {
-              input: 'runs/0/0/input',
-              answer: 'runs/0/0/answer',
+              input: '1.in',
+              answer: '1.ans',
               title: 'Sample 1',
             },
             {
-              input: 'runs/0/1/input',
-              answer: 'runs/0/1/answer',
+              input: '2.in',
+              answer: '2.ans',
               title: 'Sample 2',
             },
           ],
@@ -1443,13 +1442,7 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     });
     const planned = sent[0]?.changes.map((change) => change.path) ?? [];
     expect(planned).toEqual(
-      expect.arrayContaining([
-        'task.yaml',
-        'runs/0/0/input',
-        'runs/0/0/answer',
-        'runs/0/1/input',
-        'runs/0/1/answer',
-      ]),
+      expect.arrayContaining(['task.yaml', '1.in', '1.ans', '2.in', '2.ans']),
     );
   });
 
@@ -1468,7 +1461,7 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     server.use(
       http.get(`${TASK_API}/files/:path`, async ({ params }) => {
         const path = decodeURIComponent(String(params['path']));
-        if (!path.startsWith('runs/')) return undefined;
+        if (path !== '1.in') return undefined;
         await gate;
         return problem(404, 'not_found');
       }),
@@ -1490,7 +1483,7 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     );
     await save();
     expect(sent[0]?.changes.map((change) => change.path)).toEqual(
-      expect.arrayContaining(['task.yaml', 'runs/0/0/input']),
+      expect.arrayContaining(['task.yaml', '1.in']),
     );
   });
 
@@ -1518,7 +1511,7 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     );
     await userEvent.click(screen.getByRole('menuitem', { name: 'You give this one' }));
     expect(within(runs).getByLabelText('File for row 1 input')).toBeVisible();
-    expect(within(runs).queryByText('runs/0/0/input')).toBeNull();
+    expect(within(runs).queryByText('1.in')).toBeNull();
   });
 
   it('pairs two test files in one row and stages both in the task’s save', async () => {
@@ -1532,7 +1525,7 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     });
     await openTask();
     const runs = screen.getByRole('region', { name: 'Runs' });
-    await userEvent.upload(within(runs).getByLabelText('Add files'), [
+    await userEvent.upload(within(runs).getByLabelText('Batch add'), [
       new File(['1'], '1.in'),
       new File(['2'], '1.ans'),
     ]);
@@ -1544,119 +1537,13 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
       repeat: [
         {
           inputs: ['input', 'answer'],
-          tuples: [{ title: '1', input: 'runs/0/0/input', answer: 'runs/0/0/answer' }],
+          tuples: [{ title: '1', input: '1.in', answer: '1.ans' }],
         },
       ],
     });
     expect(sent[0]?.changes.map((change) => change.path)).toEqual(
-      expect.arrayContaining(['runs/0/0/input', 'runs/0/0/answer']),
+      expect.arrayContaining(['1.in', '1.ans']),
     );
-  });
-
-  it('keeps a remaining row’s file when another row is removed and a new row uploaded', async () => {
-    const { sent } = taskBackend({
-      content:
-        'name: Files\nworkflow: unicon/classic@v6\nrepeat:\n  - inputs: [input]\n    tuples: [{input: runs/0/0/input}, {input: runs/0/1/input}]\n',
-      form: runForm('unicon/classic@v6', [declared('input', 'file')]),
-    });
-    await openTask();
-    const runs = screen.getByRole('region', { name: 'Runs' });
-    await userEvent.click(within(runs).getByRole('button', { name: 'Remove row 1' }));
-    await userEvent.click(within(runs).getByRole('button', { name: 'Add a row' }));
-    await userEvent.upload(
-      within(runs).getByLabelText('File for row 2 input'),
-      new File(['new'], 'new.in'),
-    );
-    await waitFor(() => expect(within(runs).getByText('New')).toBeVisible());
-    await save();
-    expect(written(sent[0])).toMatchObject({
-      repeat: [
-        {
-          inputs: ['input'],
-          tuples: [{ input: 'runs/0/1/input' }, { input: 'runs/0/1/input_2' }],
-        },
-      ],
-    });
-    expect(sent[0]?.changes.map((change) => change.path)).toContain('runs/0/1/input_2');
-    expect(sent[0]?.changes.map((change) => change.path)).not.toContain(
-      'runs/0/1/input',
-    );
-  });
-
-  it('saves cartpole as two axes, 2 × 3 runs', async () => {
-    const { sent } = taskBackend({
-      content: 'name: Cartpole\nworkflow: cs2109s/cartpole@v1\n',
-      form: runForm('cs2109s/cartpole@v1', [
-        declared('weights', 'file'),
-        declared('episodes', 'number'),
-        declared('env', 'text'),
-        declared('seed', 'number'),
-      ]),
-    });
-    const { inputs } = await openTask();
-
-    await who(inputs, 'weights', 'The entrant gives it');
-    fill(fieldIn(inputs, 'episodes', 'episodes'), '100');
-    await who(inputs, 'env', 'You set one for each run');
-    await userEvent.click(
-      screen.getByText('Run each row more than once, with different settings'),
-    );
-    await who(inputs, 'seed', 'You set one for each run');
-
-    const runs = screen.getByRole('region', { name: 'Runs' });
-    expect(runs).toHaveTextContent('1 row × 1 = 1 runRun each row');
-    fill(within(runs).getByRole('textbox', { name: 'env of row 1' }), 'cartpole');
-    await userEvent.click(
-      within(runs).getAllByRole('button', { name: 'Add a row' })[0]!,
-    );
-    fill(within(runs).getByRole('textbox', { name: 'env of row 2' }), 'cartpole-wind');
-    fill(within(runs).getByRole('textbox', { name: 'seed of row 1' }), '1');
-    const seedRows = within(runs).getAllByRole('button', { name: 'Add a row' });
-    await userEvent.click(seedRows[1]!);
-    fill(within(runs).getByRole('textbox', { name: 'seed of row 2' }), '2');
-    await userEvent.click(
-      within(runs).getAllByRole('button', { name: 'Add a row' })[1]!,
-    );
-    fill(within(runs).getByRole('textbox', { name: 'seed of row 3' }), '3');
-    expect(runs).toHaveTextContent('2 rows × 3 = 6 runs');
-    await save();
-
-    expect(written(sent[0])).toMatchObject({
-      inputs: { weights: 'entrant', episodes: 100 },
-      repeat: [
-        {
-          inputs: ['env'],
-          tuples: [{ env: 'cartpole' }, { env: 'cartpole-wind' }],
-        },
-        { inputs: ['seed'], tuples: [{ seed: 1 }, { seed: 2 }, { seed: 3 }] },
-      ],
-    });
-  });
-
-  it('numbers a run’s field as the file will, when an empty axis would have sat first', async () => {
-    const { sent } = taskBackend({
-      content: 'name: Rooms\nworkflow: unicon/rooms@v1\n',
-      form: runForm('unicon/rooms@v1', [declared('env', 'text')]),
-    });
-    const { inputs } = await openTask();
-    await who(inputs, 'env', 'You set one for each run');
-    await userEvent.click(
-      screen.getByText('Run each row more than once, with different settings'),
-    );
-    await userEvent.selectOptions(
-      within(inputs).getByRole('combobox', { name: 'Table' }),
-      '1',
-    );
-
-    const runs = screen.getByRole('region', { name: 'Runs' });
-    fill(within(runs).getByRole('textbox', { name: 'env of row 1' }), 'room');
-    expect(document.querySelector('[data-field="axis-0-tuple-0-env"]')).not.toBeNull();
-    expect(document.querySelector('[data-field="axis-1-tuple-0-env"]')).toBeNull();
-    await save();
-
-    expect(written(sent[0])).toMatchObject({
-      repeat: [{ inputs: ['env'], tuples: [{ env: 'room' }] }],
-    });
   });
 
   it('saves tour with a row the entrant gives, its title and its largest size', async () => {
@@ -1714,9 +1601,9 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
         {
           inputs: ['input', 'route'],
           tuples: [
-            { input: 'runs/0/0/input', route: 'entrant', title: 'Small grid' },
+            { input: '1.in', route: 'entrant', title: 'Small grid' },
             {
-              input: 'runs/0/1/input',
+              input: '2.in',
               route: 'entrant',
               title: 'Big grid',
               max_size: '50MB',
@@ -1770,18 +1657,14 @@ repeat:
       .parentElement as HTMLElement;
     const errors = within(outcome).getByRole('list', { name: 'Errors' });
     expect(errors).toHaveTextContent('Inputs: best: Not a number.');
-    expect(errors).toHaveTextContent(
-      'Runs, table 1, row 1: title: Say what this row is.',
-    );
-    expect(errors).toHaveTextContent('Runs, table 1, row 2: max_size: At most 2GB.');
-    expect(errors).toHaveTextContent(
-      'Runs, table 1, row 1: input: There is no such file.',
-    );
+    expect(errors).toHaveTextContent('Runs, row 1: title: Say what this row is.');
+    expect(errors).toHaveTextContent('Runs, row 2: max_size: At most 2GB.');
+    expect(errors).toHaveTextContent('Runs, row 1: input: There is no such file.');
     expect(
       document.querySelector('[data-field="axis-0-tuple-0-title"]'),
     ).not.toBeNull();
     await userEvent.click(
-      within(errors).getByRole('link', { name: /Runs, table 1, row 2: max_size/ }),
+      within(errors).getByRole('link', { name: /Runs, row 2: max_size/ }),
     );
     expect(
       await screen.findByRole('textbox', { name: 'Maximum size of row 2' }),
@@ -1870,10 +1753,6 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
     await userEvent.click(line);
     expect(within(scoring).queryByText(/Click a tile to put it in/)).toBeNull();
     expect(within(scoring).queryByRole('button', { name: 'Remove total' })).toBeNull();
-    const runs = screen.getByRole('region', { name: 'Runs' });
-    await userEvent.click(
-      within(runs).getByText('Run each row more than once, with different settings'),
-    );
     expect(screen.queryByRole('region', { name: 'Save the task' })).toBeNull();
   });
 
@@ -1920,13 +1799,19 @@ inputs:
     );
     const scoring = screen.getByRole('region', { name: 'Scoring' });
     const gives = await within(scoring).findByRole('table', {
-      name: 'What one submission gives',
+      name: 'A sample result',
     });
     expect(scoring).not.toHaveTextContent('No runs yet');
     expect(scoring).not.toHaveTextContent('Every run also gives');
-    expect(scoring).toHaveTextContent(
-      'A value can also read seconds late, seconds taken and whether it compiled.',
-    );
+    expect(
+      within(within(scoring).getByRole('list', { name: 'What a value can also read' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      'seconds_late: How many seconds after the due time it came in',
+      'seconds: How many seconds after the contest started it came in',
+      'compiled: 1 when it compiled, else 0',
+    ]);
     expect(within(gives).getByRole('row', { name: /^The one run/ })).toBeVisible();
     const groups = within(scoring).getByRole('table', { name: 'Groups' });
     expect(within(groups).getByRole('row', { name: /^The one run/ })).toBeVisible();
@@ -1938,7 +1823,7 @@ inputs:
     ).toBeVisible();
   });
 
-  it('says what a run gives beyond the table, by its title, and the facts in words', async () => {
+  it('says what a run gives beyond the table, by its title', async () => {
     taskBackend({
       content: `name: Islands
 workflow: unicon/classic@v6
@@ -1960,9 +1845,7 @@ repeat:
     await openTask();
     const scoring = screen.getByRole('region', { name: 'Scoring' });
     const line = await within(scoring).findByText(/^Every run also gives/);
-    expect(line).toHaveTextContent(
-      'Every run also gives Random seed. A value can also read seconds late, seconds taken and whether it compiled.',
-    );
+    expect(line).toHaveTextContent('Every run also gives Random seed.');
   });
 
   it('lists the runs the server makes from the draft, and says when there are too many', async () => {
@@ -2039,14 +1922,13 @@ repeat:
     );
     await openTask();
     const runs = await screen.findByRole('table', {
-      name: 'What one submission gives',
+      name: 'A sample result',
     });
     await waitFor(() =>
       expect(
         within(runs).getByRole('columnheader', { name: /Compile log/ }),
       ).toHaveTextContent('text'),
     );
-    expect(within(runs).getByRole('cell', { name: 'text' })).toBeVisible();
   });
 
   it('keeps Result open with its parts and gives each part the grid shows one row', async () => {
@@ -2114,7 +1996,11 @@ repeat:
 
     const checks = screen.getByRole('region', { name: 'Checks' });
     await userEvent.click(within(checks).getByRole('button', { name: 'Add a check' }));
-    fill(within(checks).getByRole('textbox', { name: 'Solution' }), 'print(1)');
+    await userEvent.upload(
+      within(checks).getByLabelText('Solution: choose its file'),
+      new File(['print(1)\n'], 'solution.py'),
+    );
+    expect(await within(checks).findByText('solution.py, 9 B')).toBeVisible();
     expect(
       within(
         within(checks).getByRole('combobox', { name: 'Verdict every run gets' }),
@@ -2147,8 +2033,9 @@ repeat:
           },
         },
       },
-      checks: [{ submit: { code: 'print(1)' }, expect: { verdict: 'accepted' } }],
+      checks: [{ submit: { code: 'solution.py' }, expect: { verdict: 'accepted' } }],
     });
+    expect(sent[0]?.changes.map((change) => change.path)).toContain('solution.py');
   });
 
   it('drops a removed part from show, moves a renamed group, and turns off a name no part has', async () => {
@@ -2752,56 +2639,51 @@ scoring:
 });
 
 describe('the preview of what entrants see', { timeout: 30_000 }, () => {
-  /** The preview's answer for each body it is sent: what the show lists at the moment, as placeholders. */
+  /** A made-up graded submission whose values are `listed`, each 7. */
+  function resultOf(listed: string[]) {
+    return {
+      id: '00000000-0000-0000-0000-000000000000',
+      attempt: 1,
+      status: 'graded',
+      compiled: 1,
+      limit: null,
+      reason: null,
+      reveal_at: null,
+      inputs: {},
+      once: { reports: {}, texts: {} },
+      runs: [],
+      run_values: listed.map((name) => ({
+        name,
+        number: '7',
+        text: null,
+        waiting: false,
+        self_reported: false,
+        show: 'always',
+        facts: null,
+        runs: null,
+        values: null,
+      })),
+    };
+  }
+
+  /** The preview's answer for each body it is sent: the values the show lists at the moment, and two runs hidden. */
   function echoPreview(bodies: unknown[]) {
     server.use(
       http.post(`${TASK_API}/show-preview`, async ({ request }) => {
         const body = (await request.json()) as {
           show: Record<string, { values?: string[] }>;
           moment: string;
-          entrant?: string;
-          number?: number;
         };
         bodies.push(body);
         const listed = [
           ...(body.show.always?.values ?? []),
           ...(body.moment === 'always' ? [] : (body.show[body.moment]?.values ?? [])),
         ];
-        if (body.number !== undefined) {
-          return HttpResponse.json({
-            hidden: 2,
-            moment: body.moment,
-            placeholders: null,
-            result: {
-              id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c40',
-              attempt: 1,
-              status: 'graded',
-              compiled: null,
-              limit: null,
-              reason: null,
-              reveal_at: null,
-              inputs: {},
-              once: { reports: {}, texts: {} },
-              runs: [],
-              run_values: listed.map((name) => ({
-                name,
-                number: '7',
-                text: null,
-                waiting: false,
-                self_reported: false,
-                show: 'always',
-                facts: null,
-                runs: null,
-                values: null,
-              })),
-            },
-          });
-        }
         return HttpResponse.json({
-          hidden: 0,
+          hidden: 2,
           moment: body.moment,
-          placeholders: { values: listed, outputs: [], inputs: {}, runs: [] },
-          result: null,
+          result: resultOf(listed),
+          sample: [{ verdict: 'wrong_answer', passed: '0' }],
         });
       }),
     );
@@ -2815,154 +2697,68 @@ describe('the preview of what entrants see', { timeout: 30_000 }, () => {
     declared('input', 'file'),
   ]);
 
-  it('changes as a cell is toggled, at the moment picked', async () => {
+  it('changes as a cell is toggled, at the moment picked, and counts the runs hidden', async () => {
     const bodies: unknown[] = [];
     taskBackend({ content: islands, form });
     echoPreview(bodies);
     await openTask();
     const preview = await screen.findByRole('region', { name: "An entrant's page" });
-    expect(
-      await within(preview).findByText('Entrants see nothing at this moment.'),
-    ).toBeVisible();
+    expect(await within(preview).findByText('2 runs hidden')).toBeVisible();
+    expect(within(preview).queryByLabelText('Values')).toBeNull();
     await userEvent.click(cell('total', 'After release'));
-    expect(within(preview).queryByText('total appears here')).toBeNull();
     const part = screen.getByRole('region', { name: 'Preview' });
     await userEvent.click(within(part).getByRole('radio', { name: 'After release' }));
-    expect(await within(preview).findByText('total appears here')).toBeVisible();
+    await waitFor(() =>
+      expect(within(preview).getByLabelText('Values')).toHaveTextContent('total7'),
+    );
     await userEvent.click(
       within(part).getByRole('radio', { name: 'After the deadline' }),
     );
-    expect(
-      await within(preview).findByText('Entrants see nothing at this moment.'),
-    ).toBeVisible();
+    await waitFor(() => expect(within(preview).queryByLabelText('Values')).toBeNull());
     expect(bodies.at(-1)).toEqual({
       show: { after_release: { values: ['total'] } },
       moment: 'after_deadline',
     });
-    expect(screen.queryByText(/Publish to preview these changes/)).toBeNull();
   });
 
-  it('previews with a graded submission picked by entrant and number, and counts the runs hidden', async () => {
-    const bodies: unknown[] = [];
-    taskBackend({
-      content: `${islands}  show:\n    always:\n      values: [total]\n`,
-      form,
-    });
-    echoPreview(bodies);
-    const graded = {
-      id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c41',
-      submission_number: 3,
-      submitted_at: '2026-09-26T10:00:00Z',
-      publication: 2,
-      attempt: 1,
-      latest: true,
-      status: 'done' as const,
-      error: null,
-      result: null,
-      queued_at: '2026-09-26T10:00:00Z',
-      dispatched_at: null,
-      started_at: null,
-      finished_at: null,
-      deadline_at: null,
-      cancel_reason: null,
-      automatic: false,
-      limit: null,
-      retry_limit: null,
-      regrade: null,
-      change: null,
-      last_good: null,
-      submitted_by: null,
-    };
-    const by = { entrant: 'e-ada', entrant_name: 'Ada', user_id: 11, username: 'ada' };
-    server.use(
-      http.get(`${TASK_API}/gradings`, () =>
-        HttpResponse.json([
-          { task: 'sum', label: 'A', by, grading: graded },
-          {
-            task: 'sum',
-            label: 'A',
-            by,
-            grading: { ...graded, id: `${graded.id.slice(0, -1)}2`, status: 'running' },
-          },
-        ]),
-      ),
-    );
+  it('fills the sample result with the made-up run the preview gives', async () => {
+    taskBackend({ content: islands, form });
+    echoPreview([]);
     await openTask();
-    const preview = await screen.findByRole('region', { name: "An entrant's page" });
-    expect(await within(preview).findByText('total appears here')).toBeVisible();
-    const picker = await screen.findByRole('combobox', { name: 'Preview with' });
-    expect(picker).toHaveDisplayValue('No submission');
+    const table = await screen.findByRole('table', { name: 'A sample result' });
     await waitFor(() =>
-      expect(
-        within(picker)
-          .getAllByRole('option')
-          .map((option) => option.textContent),
-      ).toEqual(['No submission', 'Ada, #3']),
+      expect(within(table).getAllByRole('row')[1]).toHaveTextContent('wrong_answer0'),
     );
-    await userEvent.selectOptions(picker, 'Ada, #3');
-    expect(await within(preview).findByText('2 runs hidden')).toBeVisible();
-    expect(within(preview).getByLabelText('Values')).toHaveTextContent('total7');
-    expect(bodies.at(-1)).toMatchObject({
-      entrant: 'e-ada',
-      number: 3,
-      moment: 'always',
-    });
   });
 
-  it('says to publish first while the draft changes more than show, or the saved task is not the publication', async () => {
-    taskBackend({ content: islands, form });
-    await openTask();
-    const scoring = await screen.findByRole('region', { name: 'Scoring' });
-    await screen.findByRole('region', { name: "An entrant's page" });
-    await userEvent.click(cell('total', 'Always'));
-    expect(screen.queryByText(/Publish to preview these changes/)).toBeNull();
-    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a value' }));
-    expect(screen.getByText(/Publish to preview these changes/)).toBeVisible();
-  });
-
-  it('says so of a saved task ahead of its publication', async () => {
-    taskBackend({ content: islands, form });
-    server.use(http.get(TASK_API, () => HttpResponse.json(draftTask)));
-    await openTask();
-    expect(await screen.findByText(/Publish to preview these changes/)).toBeVisible();
-  });
-
-  it('asks again once a save publishes, though the show it sends is the same', async () => {
-    let published = publishedTask;
+  it('asks again once a save changes the draft, though the show it sends is the same', async () => {
+    let saved = publishedTask;
     let asked = 0;
     taskBackend({
       content: `${islands}  show:\n    always:\n      values: [total]\n`,
       form,
       answer: () => {
-        const latest = { ...publications[1]!, number: 3, version: 'f'.repeat(20) };
-        published = { ...publishedTask, head: latest.version, latest };
+        saved = { ...publishedTask, head: 'f'.repeat(20) };
         return HttpResponse.json(PUBLISHED);
       },
     });
     server.use(
-      http.get(TASK_API, () => HttpResponse.json(published)),
+      http.get(TASK_API, () => HttpResponse.json(saved)),
       http.post(`${TASK_API}/show-preview`, () => {
         asked += 1;
         return HttpResponse.json({
           hidden: 0,
           moment: 'always',
-          placeholders: {
-            values: [`answer ${String(asked)}`],
-            outputs: [],
-            inputs: {},
-            runs: [],
-          },
-          result: null,
+          result: resultOf([`answer${String(asked)}`]),
+          sample: [],
         });
       }),
     );
     const { inputs } = await openTask();
-    expect(await screen.findByText('answer 1 appears here')).toBeVisible();
+    expect(await screen.findByText('answer1')).toBeVisible();
     fill(fieldIn(inputs, 'code', 'Label shown to entrants'), 'Your solution');
-    expect(await screen.findByText(/Publish to preview these changes/)).toBeVisible();
     await save();
-    expect(await screen.findByText('answer 2 appears here')).toBeVisible();
-    expect(screen.queryByText(/Publish to preview these changes/)).toBeNull();
+    expect(await screen.findByText('answer2')).toBeVisible();
   });
 
   it('says why when the task could not be read, rather than waiting', async () => {
@@ -2975,16 +2771,15 @@ describe('the preview of what entrants see', { timeout: 30_000 }, () => {
     ).toBeVisible();
   });
 
-  it('asks a task never published to be published first', async () => {
-    const bodies: unknown[] = [];
+  it('previews a task never published', async () => {
     taskBackend({ content: islands, form });
-    echoPreview(bodies);
+    echoPreview([]);
     server.use(
       http.get(TASK_API, () => HttpResponse.json({ ...publishedTask, latest: null })),
     );
     await openTask();
-    expect(await screen.findByText('Publish the task to preview it.')).toBeVisible();
-    expect(bodies).toEqual([]);
+    const preview = await screen.findByRole('region', { name: "An entrant's page" });
+    expect(await within(preview).findByText('2 runs hidden')).toBeVisible();
   });
 
   it('words a show the save would refuse as the save does', async () => {

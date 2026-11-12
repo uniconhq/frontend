@@ -30,22 +30,54 @@ export const ORG_SECTIONS = [
 
 export const CONTEST_SECTIONS = [
   { key: 'settings', label: 'Settings', segment: 'settings', card: 'summary' },
-  { key: 'entry', label: 'How people enter', segment: 'entry', card: 'grid' },
-  { key: 'entrants', label: 'Entrants', segment: 'entrants', card: 'grid' },
-  { key: 'gradings', label: 'Gradings', segment: 'gradings', card: 'grid' },
-  { key: 'boards', label: 'Leaderboards', segment: 'leaderboards', card: 'grid' },
+  {
+    key: 'entry',
+    label: 'How people enter',
+    segment: 'entry',
+    card: 'grid',
+    line: 'How people register for the contest.',
+  },
+  {
+    key: 'entrants',
+    label: 'Entrants',
+    segment: 'entrants',
+    card: 'grid',
+    line: 'Everyone registered, and those waiting for approval.',
+  },
+  {
+    key: 'gradings',
+    label: 'Gradings',
+    segment: 'gradings',
+    card: 'grid',
+    line: "Every submission's grading in the contest. Grade one again from here.",
+  },
+  {
+    key: 'boards',
+    label: 'Leaderboards',
+    segment: 'leaderboards',
+    card: 'grid',
+    line: 'The contest’s leaderboards, and when they freeze.',
+  },
   {
     key: 'announcements',
     label: 'Announcements',
     segment: 'announcements',
     card: 'grid',
+    line: 'Messages from the organisers to every entrant.',
   },
-  { key: 'questions', label: 'Questions', segment: 'questions', card: 'grid' },
+  {
+    key: 'questions',
+    label: 'Questions',
+    segment: 'questions',
+    card: 'grid',
+    line: 'Questions from entrants, and your answers.',
+  },
   {
     key: 'organisers',
     label: 'Contest organisers',
     segment: 'organisers',
     card: 'grid',
+    line: 'Who can change or read this contest, and what each role may do.',
   },
 ] as const satisfies readonly Section[];
 
@@ -69,14 +101,14 @@ export const TASK_SECTIONS = [
     label: 'Marking',
     segment: 'marking',
     card: 'grid',
-    line: 'Submissions waiting for a mark you give by hand. A task can leave a value to organisers; each counted submission waits here until it has its marks.',
+    line: 'Submissions waiting for a mark you give by hand.',
   },
   {
     key: 'publications',
     label: 'Publications',
     segment: 'publications',
     card: 'grid',
-    line: "A publication is the task as entrants are graded on it. Every save without problems makes a new one, numbered from 1, and entrants are graded on the newest. While the contest is running, a save asks before publishing, since it may grade earlier submissions again. If a publication's checks fail, entrants stay on the last one that passed.",
+    line: 'Each save without problems makes a new version of the task. Entrants are graded on the newest one whose checks passed.',
   },
   {
     key: 'announcements',
@@ -96,8 +128,7 @@ export const TASK_SECTIONS = [
     key: 'settings',
     label: 'Settings',
     segment: 'settings',
-    card: 'grid',
-    line: "The task's title, and the files it is saved as.",
+    card: 'summary',
   },
 ] as const satisfies readonly Section[];
 

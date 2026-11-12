@@ -3,11 +3,11 @@ import { $api, queryView } from '@/api/query';
 import type { FileChange, TaskState, WorkflowForm } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { HubCard } from '@/ui/HubCard';
 import { Chip } from '@/ui/Chip';
-import { PageLink } from '@/ui/PageLink';
 import { Loaded } from '@/ui/feedback/Loaded';
-import { Group, Stack } from '@/ui/layout';
-import { taskCardPath } from '@/lib/sections';
+import { Group } from '@/ui/layout';
+import { taskCardPath, taskSectionPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { TaskInContest } from '../contest/TaskEntry';
@@ -19,6 +19,7 @@ import { inputTitle, taskPath, useWorkflowForm, type TaskPlace } from './build-d
 import type { TaskSave } from './build-save';
 import { taskPlaceOf } from './places';
 import { publishedLine, savedBy } from './published';
+import { Checklist, StatusBox, Summary } from '../hub/Status';
 import classes from './task.module.css';
 
 const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
@@ -154,28 +155,6 @@ function readiness(
   ];
 }
 
-/** The readiness row: a link to each part's card, ticked or saying what it lacks. */
-function Ready({ place, items }: { place: TaskPlace; items: Item[] }) {
-  return (
-    <ul className={classes.ready} aria-label="What the task has">
-      {items.map((item) => (
-        <li key={item.text}>
-          <span
-            className={item.ok ? classes.tick : classes.missing}
-            role="img"
-            aria-label={item.ok ? 'Done' : 'Not done'}
-          >
-            {item.ok ? '✓' : '✗'}
-          </span>
-          <PageLink to={taskCardPath(place.org, place.contest, place.task, item.card)}>
-            {item.text}
-          </PageLink>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /**
  * What a save left the task with, and what to do next: a save with problems,
  * each linked to where it is fixed; or a draft kept back, with Publish it.
@@ -229,12 +208,30 @@ function NextStep({
   );
 }
 
+/** Where the task's files stand, and when they were last saved, by whom. */
+export function TaskStateLine({ place }: { place: TaskPlace }) {
+  const path = taskPath(place);
+  const state = $api.useQuery('get', TASK, { params: { path } }).data;
+  const last = $api.useQuery('get', `${TASK}/history`, { params: { path } }).data?.[0];
+  if (state === undefined) return null;
+  return (
+    <>
+      <StateChip state={state} />
+      {last !== undefined && (
+        <BodyText tone="secondary">
+          Last saved {formatDateTime(new Date(last.at))}
+          {last.author === null ? '' : ` by ${last.author}`}
+        </BodyText>
+      )}
+    </>
+  );
+}
+
 /**
- * The top of a task's page: where it stands in its contest and its
- * timeline, changed from there (M68); where its files stand and when they
- * were last saved, by whom; a tick for each part of the task that is done, or what it
- * lacks, each going to its card; what entrants are graded on (M21); and what
- * to do next when a save is stuck.
+ * Under a task's title: a box with a tick for each part of the task that is
+ * done, or what it lacks, each going to its card, and what to do next when a
+ * save is stuck; then its facts at a glance: its timeline in the contest
+ * (M68), what entrants are graded on (M21), its results and its toolchains.
  */
 export function TaskStanding({
   place,
@@ -256,71 +253,107 @@ export function TaskStanding({
   );
   const runs = useDraftRuns(place, saved?.axes ?? [], saved?.inputs ?? []).runs;
   const changes: FileChange[] | undefined = history.data;
-  const last = changes?.[0];
 
   return (
     <Loaded view={state} rows={2}>
-      {(task) => (
-        <Stack gap={6} aria-label="Where the task stands">
-          <TaskInContest org={place.org} contest={place.contest} task={place.task} />
-          <Group gap="6px 10px">
-            <StateChip state={task} />
-            {last !== undefined && (
-              <BodyText tone="secondary">
-                Last saved {formatDateTime(new Date(last.at))}
-                {last.author === null ? '' : ` by ${last.author}`}
-              </BodyText>
-            )}
-          </Group>
-          {/* Only once both are read, so it never says what they lack meanwhile. */}
-          {!form.isPending && !settings.isPending && (
-            <Ready
-              place={place}
-              items={readiness(
-                task,
-                form.isError ? null : (form.data ?? null),
-                settings.data?.values ?? null,
-                runs?.count ?? null,
+      {(task) => {
+        const toolchains = Object.entries(task.toolchains ?? {});
+        return (
+          <div className={classes.standing} aria-label="Where the task stands">
+            <StatusBox>
+              {/* Only once both are read, so it never says what they lack meanwhile. */}
+              {!form.isPending && !settings.isPending && (
+                <Checklist
+                  label="What the task has"
+                  checks={readiness(
+                    task,
+                    form.isError ? null : (form.data ?? null),
+                    settings.data?.values ?? null,
+                    runs?.count ?? null,
+                  ).map((item) => ({
+                    key: item.card,
+                    ok: item.ok,
+                    text: item.text,
+                    to: taskCardPath(place.org, place.contest, place.task, item.card),
+                  }))}
+                />
               )}
-            />
-          )}
-          <BodyText>
-            {publishedLine(
-              task.latest,
-              task.latest === null ? null : savedBy(task.latest, changes),
-            )}
-          </BodyText>
-          {Object.entries(task.toolchains ?? {}).map(([language, toolchain]) => (
-            <BodyText key={language} tone="secondary">
-              {LANGUAGE_NAMES[language] ?? language}: {pickedWords(toolchain.picked)} (
-              {toolchain.version === null
-                ? 'newest when first prepared'
-                : `named ${toolchain.version}`}
-              )
-            </BodyText>
-          ))}
-          {(task.latest?.failed_checks ?? []).length > 0 && (
-            <ul aria-label="Failed checks">
-              {(task.latest?.failed_checks ?? []).map((check) => (
-                <li key={check.index}>
-                  Check {String(check.index)}
-                  <ul>
-                    {check.failing.map((sentence) => (
-                      <li key={sentence}>{sentence}</li>
-                    ))}
-                    {check.runs.map((run) => (
-                      <li key={run.id}>
-                        {run.id}: {run.verdict}
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          )}
-          <NextStep place={place} state={task} saving={saving} manager={manager} />
-        </Stack>
-      )}
+              {(task.latest?.failed_checks ?? []).length > 0 && (
+                <ul aria-label="Failed checks">
+                  {(task.latest?.failed_checks ?? []).map((check) => (
+                    <li key={check.index}>
+                      Check {String(check.index)}
+                      <ul>
+                        {check.failing.map((sentence) => (
+                          <li key={sentence}>{sentence}</li>
+                        ))}
+                        {check.runs.map((run) => (
+                          <li key={run.id}>
+                            {run.id}: {run.verdict}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <BodyText>
+                {publishedLine(
+                  task.latest,
+                  task.latest === null ? null : savedBy(task.latest, changes),
+                )}
+              </BodyText>
+              <NextStep place={place} state={task} saving={saving} manager={manager} />
+            </StatusBox>
+            <HubCard
+              title="Settings"
+              to={taskSectionPath(place.org, place.contest, place.task, 'settings')}
+            >
+              <Summary
+                label="The settings"
+                items={[
+                  {
+                    term: 'Timeline',
+                    value: (
+                      <TaskInContest
+                        org={place.org}
+                        contest={place.contest}
+                        task={place.task}
+                        readOnly
+                      />
+                    ),
+                  },
+                  ...(task.results === undefined
+                    ? []
+                    : [
+                        {
+                          term: 'Results',
+                          value: task.results.released ? 'Released' : 'Not released',
+                        },
+                      ]),
+                  ...(toolchains.length === 0
+                    ? []
+                    : [
+                        {
+                          term: 'Toolchains',
+                          value: toolchains.map(([language, toolchain]) => (
+                            <div key={language}>
+                              {LANGUAGE_NAMES[language] ?? language}:{' '}
+                              {pickedWords(toolchain.picked)} (
+                              {toolchain.version === null
+                                ? 'newest when first prepared'
+                                : `named ${toolchain.version}`}
+                              )
+                            </div>
+                          )),
+                        },
+                      ]),
+                ]}
+              />
+            </HubCard>
+          </div>
+        );
+      }}
     </Loaded>
   );
 }

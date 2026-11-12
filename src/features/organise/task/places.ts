@@ -172,10 +172,7 @@ export function taskPlace(
       const name = typeof fifth === 'string' ? fifth : null;
       return {
         card: 'runs',
-        label:
-          name === null
-            ? 'Runs'
-            : `Runs, table ${String(axis + 1)}, row ${String(row + 1)}: ${name}`,
+        label: name === null ? 'Runs' : `Runs, row ${String(row + 1)}: ${name}`,
         field:
           name === null ? null : `axis-${String(axis)}-tuple-${String(row)}-${name}`,
         item: null,

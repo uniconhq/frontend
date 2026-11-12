@@ -137,10 +137,13 @@ export function TaskInContest({
   org,
   contest,
   task,
+  readOnly = false,
 }: {
   org: string;
   contest: string;
   task: string;
+  /** Says it without Change, as a summary does. */
+  readOnly?: boolean;
 }) {
   const path = { org, contest };
   const view = queryView(
@@ -151,17 +154,21 @@ export function TaskInContest({
       ? view.data.find((found) => found.task.name === task)
       : undefined;
   if (standing === undefined) return null;
-  return <EntryOfTask org={org} contest={contest} standing={standing} />;
+  return (
+    <EntryOfTask org={org} contest={contest} standing={standing} readOnly={readOnly} />
+  );
 }
 
 function EntryOfTask({
   org,
   contest,
   standing,
+  readOnly,
 }: {
   org: string;
   contest: string;
   standing: TaskStanding;
+  readOnly: boolean;
 }) {
   const manages = usePlaceMay({ kind: 'contest', org, contest }).manage;
   const settings = useContestSettings(org, contest);
@@ -190,7 +197,7 @@ function EntryOfTask({
       <EntryLine
         sentence={entrySentence(standing, values)}
         label={label}
-        onOpen={manages ? () => setOpen(true) : null}
+        onOpen={manages && !readOnly ? () => setOpen(true) : null}
       />
       <TaskEntryDialog
         org={org}

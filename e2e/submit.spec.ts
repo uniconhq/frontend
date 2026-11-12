@@ -443,7 +443,10 @@ test('a submission opens with its runs and its log, read when it is shown', asyn
   const samples = detail.getByRole('region', { name: 'Group samples' });
   await expect(samples.getByText('Small grid')).toBeVisible();
   await expect(samples.getByText('WRONG ANSWER')).toBeVisible();
-  await expect(samples).toContainText('Run time (ms) 30');
+  await expect(
+    samples.getByRole('columnheader', { name: 'Run time (ms)' }),
+  ).toBeVisible();
+  await expect(samples.getByRole('cell', { name: '30', exact: true })).toBeVisible();
   await detail.getByRole('button', { name: 'Show log' }).click();
   await expect(detail.getByLabel('log', { exact: true })).toHaveText(
     'Compiled cleanly.',
@@ -476,9 +479,9 @@ test('a submission that did not compile shows that on its runs, with its log', a
     page.getByRole('table', { name: 'Your submissions' }).getByText('GRADED'),
   ).toBeVisible();
   const detail = page.getByRole('region', { name: 'Submission 1' });
-  await expect(
-    detail.getByRole('region', { name: 'Group samples' }).getByText('COMPILE ERROR'),
-  ).toBeVisible();
+  const samples = detail.getByRole('region', { name: 'Group samples' });
+  await expect(samples.getByText('COMPILE ERROR')).toBeVisible();
+  await expect(samples.getByRole('cell', { name: 'No', exact: true })).toBeVisible();
   await detail.getByRole('button', { name: 'Show log' }).click();
   await expect(detail.getByLabel('log', { exact: true })).toHaveText(
     'main.cpp:1: error',
@@ -486,7 +489,7 @@ test('a submission that did not compile shows that on its runs, with its log', a
   await expect(detail.getByLabel('Facts', { exact: true })).toHaveText(
     /Whether it compiled\s*No/,
   );
-  await expect(detail.getByRole('table')).toHaveCount(0);
+  await expect(detail.getByRole('table')).toHaveCount(1);
 });
 
 test('a submission whose grading failed on Unicon’s side reads as delayed', async ({
@@ -767,7 +770,7 @@ test('a result shows only what its show names, and a shown input downloads throu
   await expect(samples).toContainText('1.in');
   await expect(samples).not.toContainText('ACCEPTED');
   await expect(
-    detail.getByRole('region', { name: 'Group First test not passed' }),
+    detail.getByRole('region', { name: 'Group First failed run' }),
   ).toContainText('Test 3 of big');
   await expect(detail.getByLabel('Inputs')).toContainText('time_limit2');
   await expect(detail.getByRole('button', { name: 'Show log' })).toHaveCount(0);

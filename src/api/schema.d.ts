@@ -2566,16 +2566,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * What an entrant would be shown at a moment under a draft show
-         * @description The task's latest publication with the draft's `show` in its place,
-         *     read at the moment picked as its entrant would read it then: the
-         *     submission named, or with none, what they would be shown before any,
-         *     with `hidden` the runs staff read that the entrant would not be shown.
-         *     The draft is checked alone against the publication, and a problem is
-         *     `invalid_definition` at its path in `task.yaml`, under `scoring.show`,
-         *     as the save words it. Nothing is saved. A task never published is
-         *     `not_found`, "Publish the task to preview it.", and so is an entrant
-         *     with no submission of that number.
+         * What an entrant would be shown of a made-up submission under a draft show
+         * @description A made-up graded submission of the task as saved, with the draft's
+         *     `show` in its place, read at the moment picked as its entrant would read
+         *     it then, with `hidden` the runs staff read that the entrant would not be
+         *     shown, and each run's made-up result. Nothing needs publishing: the saved
+         *     task is checked as its save checks it, and the draft `show` alone, and a
+         *     problem is `invalid_definition` at its path, as the save words it.
+         *     Nothing is saved.
          */
         post: operations["previewTaskShow"];
         delete?: never;
@@ -4169,6 +4167,28 @@ export interface components {
             unit: string | null;
         };
         /**
+         * DefaultLimits
+         * @description The submission limits a task has when its `task.yaml` sets none: at
+         *     most `max` in all, and at most `count` in any `per` seconds.
+         */
+        DefaultLimits: {
+            /**
+             * Count
+             * @default 1
+             */
+            count: number;
+            /**
+             * Max
+             * @default 50
+             */
+            max: number;
+            /**
+             * Per
+             * @default 30
+             */
+            per: number;
+        };
+        /**
          * DefinitionError
          * @description One thing wrong with a definition file: where, as its keys and list
          *     indices, such as `["tasks", 1, "due"]`, empty for the file as a whole
@@ -5489,42 +5509,6 @@ export interface components {
             most: number;
         };
         /**
-         * PlaceholderRun
-         * @description A run an entrant would be shown before there is a submission: the
-         *     entry's `of` and its place there, one tuple per axis with the inputs
-         *     it shows, and the names of the fields its result would fill.
-         *     `first_not_passed` is one row with no tuples, since which run it picks
-         *     is not known.
-         */
-        PlaceholderRun: {
-            /** Fields */
-            fields: string[];
-            /** Group */
-            group: string;
-            /** Place */
-            place: number;
-            /** Tuples */
-            tuples: components["schemas"]["RunTuple"][];
-        };
-        /**
-         * Placeholders
-         * @description What an entrant would be shown of a submission at a moment, before
-         *     there is one: the values and the outputs given once by name, the
-         *     shared inputs, as a result shows them, and each run shown.
-         */
-        Placeholders: {
-            /** Inputs */
-            inputs: {
-                [key: string]: unknown;
-            };
-            /** Outputs */
-            outputs: string[];
-            /** Runs */
-            runs: components["schemas"]["PlaceholderRun"][];
-            /** Values */
-            values: string[];
-        };
-        /**
          * PlaceMay
          * @description At a contest or a task: change it (`files.write`, `task_save.save`
          *     and every other manager's action there), change its admin-only
@@ -6734,11 +6718,11 @@ export interface components {
         };
         /**
          * ShowPreview
-         * @description What an entrant would be shown at `moment` under a draft `show`: the
-         *     submission named as its entrant would read it then (`result`), or with
-         *     none named, what they would be shown before any submission
-         *     (`placeholders`); the other is null. `hidden` counts the runs staff
+         * @description What an entrant would be shown at `moment` of a made-up graded
+         *     submission under the draft (`result`). `hidden` counts the runs staff
          *     read that the entrant would not be shown, which no entrant is told.
+         *     `sample` is each run's made-up result in the task's order, by field
+         *     name: `verdict`, `passed` and each output, a number exactly or a text.
          */
         ShowPreview: {
             /** Hidden */
@@ -6748,26 +6732,23 @@ export interface components {
              * @enum {string}
              */
             moment: "always" | "after_deadline" | "after_release";
-            placeholders: components["schemas"]["Placeholders"] | null;
-            result: components["schemas"]["Result"] | null;
+            result: components["schemas"]["Result"];
+            /** Sample */
+            sample: {
+                [key: string]: string;
+            }[];
         };
         /**
          * ShowPreviewRequest
          * @description A staff preview of a draft `show`: the draft, as `scoring.show` in
-         *     `task.yaml` holds it, the moment to read it at, and optionally a
-         *     submission, by its entrant and its number among the entrant's, both
-         *     or neither.
+         *     `task.yaml` holds it, and the moment to read it at.
          */
         ShowPreviewRequest: {
-            /** Entrant */
-            entrant?: string | null;
             /**
              * Moment
              * @enum {string}
              */
             moment: "always" | "after_deadline" | "after_release";
-            /** Number */
-            number?: number | null;
             /** Show */
             show: {
                 [key: string]: unknown;
@@ -7547,7 +7528,8 @@ export interface components {
          *     comes after the one the task names, which the task keeps until someone
          *     saves it naming another (Task 10.6.5). `text_values` names the values
          *     that give text, in the file's order, none when the settings cannot be
-         *     read; a workflow output stays a number.
+         *     read; a workflow output stays a number. `limits` are what a task
+         *     allows when its `task.yaml` sets none, for the form to show.
          */
         WorkflowForm: {
             /**
@@ -7560,6 +7542,14 @@ export interface components {
              * @default []
              */
             inputs: components["schemas"]["DeclaredInput"][];
+            /**
+             * @default {
+             *       "count": 1,
+             *       "max": 50,
+             *       "per": 30
+             *     }
+             */
+            limits: components["schemas"]["DefaultLimits"];
             /** Newer */
             newer: string | null;
             /** Problem */

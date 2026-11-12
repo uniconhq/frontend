@@ -78,9 +78,7 @@ describe('contest writers answer the save question', () => {
   it('confirms the entry form', async () => {
     const sent = asks();
     renderApp(`${CONTEST}/entry`);
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Students at a domain' }),
-    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Email domain' }));
     await userEvent.type(
       screen.getByRole('textbox', { name: 'Email domains' }),
       'u.nus.edu',
@@ -126,17 +124,13 @@ describe('contest writers answer the save question', () => {
     await confirm(sent);
   });
 
-  it('confirms a status card change', async () => {
+  it('confirms a change of who sees it', async () => {
     const sent = asks();
-    renderApp(CONTEST);
+    renderApp(`${CONTEST}/settings`);
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Change who sees it' }),
+      await screen.findByRole('radio', { name: 'Anyone, signed in or not' }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Who sees it' });
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Anyone, signed in or not' }),
-    );
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save settings' }));
     await confirm(sent);
   });
 

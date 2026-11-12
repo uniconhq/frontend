@@ -3,9 +3,9 @@ import { $api } from '@/api/query';
 import type { WorkflowItem } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { Stack } from '@/ui/layout';
 import { WorkflowSearch } from '../workflows/WorkflowSearch';
 import { refParts } from './build-data';
-import classes from './task.module.css';
 
 /** A saved pin remains visible even after its owner stops new use. */
 export function WorkflowPicker({
@@ -35,7 +35,7 @@ export function WorkflowPicker({
   const item = listed ?? page.data;
   const mark = parts === null ? undefined : item?.yanked?.[parts.version];
   return (
-    <div className={classes.grid}>
+    <Stack gap={8} align="flex-start">
       <BodyText>{value || 'No workflow chosen'}</BodyText>
       {item?.description && <BodyText tone="secondary">{item.description}</BodyText>}
       {mark && <BodyText>Not for new tasks. {mark.reason}</BodyText>}
@@ -52,6 +52,6 @@ export function WorkflowPicker({
           }}
         />
       )}
-    </div>
+    </Stack>
   );
 }

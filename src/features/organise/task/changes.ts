@@ -79,7 +79,7 @@ export function changeLines(
     before.rateCount !== after.rateCount ||
     before.ratePer !== after.ratePer
   ) {
-    lines.push('Submission rules');
+    lines.push('Submissions');
   }
   return lines;
 }

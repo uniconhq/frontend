@@ -5,12 +5,10 @@ import { lastPart, type TaskPlace } from './build-data';
 import { filesUnder, type PlannedChange, type Source } from './staged';
 
 /**
- * A file or a folder chosen for a setting of the task on the Inputs card
- * (M51), waiting for the one save of the task: the files written under the
- * input's own folder, named as its id, and what the setting then names; the
- * file or files it named before, when they were under that folder too, are
- * taken out, so a replaced checker leaves nothing behind. Files elsewhere in
- * the task are left as they are.
+ * A file or a folder chosen on the Inputs card or in a run's cell (M51),
+ * waiting for the one save of the task: written at the top of the task under
+ * its own name, a folder with the files inside it, and what the setting or
+ * cell then names. What it replaces is taken out.
  */
 export type StagedInput = {
   id: string;
@@ -28,68 +26,61 @@ function sourceOf(file: File): Source {
   return { path: file.name, size: file.size, read: () => Promise.resolve(file) };
 }
 
-/** A folder's file by its path inside the folder chosen: `data/a.csv` is `a.csv`. */
-function insideFolder(file: File): string {
-  const path = file.webkitRelativePath === '' ? file.name : file.webkitRelativePath;
-  const parts = path.split('/');
-  return parts.length > 1 ? parts.slice(1).join('/') : path;
+/** A file's own path: its name, or `data/a.csv` inside a folder chosen. */
+function ownPath(file: File): string {
+  return file.webkitRelativePath || file.name;
 }
 
-/**
- * The file or files a setting named before, with their tokens, when they
- * were under its own folder `home`; none when they were elsewhere.
- */
-async function ownBefore(
+/** The file or folder's files `was` names, with their tokens, to take out. */
+async function replaced(
   place: TaskPlace,
-  home: string,
   was: string,
 ): Promise<{ path: string; token: string }[]> {
-  if (!was.startsWith(`${home}/`)) return [];
+  if (was === '') return [];
   if (was.endsWith('/')) return filesUnder(place, was.slice(0, -1));
   const token = await tokenNow(place, was);
   return token === null ? [] : [{ path: was, token }];
 }
 
-/**
- * The files chosen for an input as one change of the save: each written at
- * `<own folder>/<name>`, with the token of a file already there, and what the
- * setting named before taken out when it was under that folder and is not
- * written over.
- */
+/** The planned writes, and the replaced files they do not write over taken out. */
+async function withReplaced(
+  place: TaskPlace,
+  planned: PlannedChange[],
+  was: string,
+): Promise<PlannedChange[]> {
+  const old = (await replaced(place, was)).filter(
+    (file) => !planned.some((change) => change.path === file.path),
+  );
+  return [
+    ...planned,
+    ...old.map((file) => ({
+      path: file.path,
+      token: file.token,
+      remove: true as const,
+    })),
+  ];
+}
+
+/** The files chosen for a setting as one change of the save. */
 export async function stageInputFiles(
   place: TaskPlace,
   declared: DeclaredInput,
   files: File[],
   was: string,
 ): Promise<StagedInput> {
-  const home = declared.id;
   const folder = declared.type === 'folder';
-  const chosen = files.map((file) => ({
-    path: `${home}/${folder ? insideFolder(file) : file.name}`,
-    source: sourceOf(file),
-  }));
-  const value = folder ? `${home}/` : (chosen[0]?.path ?? '');
-  const before = await ownBefore(place, home, was);
   const planned: PlannedChange[] = [];
-  for (const file of chosen) {
-    const known = before.find((old) => old.path === file.path);
-    planned.push({
-      path: file.path,
-      token: known?.token ?? (await tokenNow(place, file.path)),
-      source: file.source,
-    });
+  for (const file of files) {
+    const path = ownPath(file);
+    planned.push({ path, token: await tokenNow(place, path), source: sourceOf(file) });
   }
-  for (const old of before) {
-    if (!chosen.some((file) => file.path === old.path)) {
-      planned.push({ path: old.path, token: old.token, remove: true });
-    }
-  }
+  const first = planned[0]?.path ?? '';
   const size = files.reduce((sum, file) => sum + file.size, 0);
   return {
     id: declared.id,
-    value,
+    value: folder ? `${first.split('/')[0] ?? ''}/` : first,
     was,
-    planned,
+    planned: await withReplaced(place, planned, was),
     summary:
       files.length === 1 && !folder
         ? `${files[0]?.name ?? ''}, ${formatSize(size)}`
@@ -97,22 +88,15 @@ export async function stageInputFiles(
   };
 }
 
-/**
- * Whether an upload's path is one a file setting would write: a file right
- * in the setting's own folder, as a file chosen for it is saved. A folder
- * setting takes no single upload.
- */
+/** Whether an upload is one a file setting can take: a single file, not in a folder. */
 export function uploadFits(declared: DeclaredInput, path: string): boolean {
-  const home = `${declared.id}/`;
-  const name = path.startsWith(home) ? path.slice(home.length) : '';
-  return declared.type === 'file' && name !== '' && !name.includes('/');
+  return declared.type === 'file' && path !== '' && !path.includes('/');
 }
 
 /**
  * An upload the door holds and no save has used yet, chosen for the file
  * setting it fits (`uploadFits`), as one change of the save: written by its
- * upload id, so nothing is sent again, with the token of a file already at
- * its path; what the setting named before is taken out as for a file chosen.
+ * upload id, so nothing is sent again.
  */
 export async function stageStoredUpload(
   place: TaskPlace,
@@ -120,51 +104,42 @@ export async function stageStoredUpload(
   upload: { id: string; path: string; size: number },
   was: string,
 ): Promise<StagedInput> {
-  const before = await ownBefore(place, declared.id, was);
-  const known = before.find((old) => old.path === upload.path);
-  const planned: PlannedChange[] = [
-    {
-      path: upload.path,
-      token: known?.token ?? (await tokenNow(place, upload.path)),
-      upload: upload.id,
-      size: upload.size,
-    },
-  ];
-  for (const old of before) {
-    if (old.path !== upload.path) {
-      planned.push({ path: old.path, token: old.token, remove: true });
-    }
-  }
   return {
     id: declared.id,
     value: upload.path,
     was,
-    planned,
+    planned: await withReplaced(
+      place,
+      [
+        {
+          path: upload.path,
+          token: await tokenNow(place, upload.path),
+          upload: upload.id,
+          size: upload.size,
+        },
+      ],
+      was,
+    ),
     summary: `${lastPart(upload.path)}, ${formatSize(upload.size)}`,
   };
 }
 
-/**
- * A file for one cell of a run. The editor names the path (`runs/0/1/input`),
- * so the file's own name is never what the task stores.
- */
+/** A file for one cell of a run, in place of the one it named, `was`. */
 export async function stageRunFile(
   place: TaskPlace,
-  path: string,
   file: File,
   was: string,
 ): Promise<StagedInput> {
-  const token = await tokenNow(place, path);
-  const planned: PlannedChange[] = [{ path, token, source: sourceOf(file) }];
-  if (was !== '' && was !== path) {
-    const old = await tokenNow(place, was);
-    if (old !== null) planned.push({ path: was, token: old, remove: true });
-  }
+  const path = file.name;
   return {
     id: path,
     value: path,
-    was,
-    planned,
+    was: '',
+    planned: await withReplaced(
+      place,
+      [{ path, token: await tokenNow(place, path), source: sourceOf(file) }],
+      was,
+    ),
     summary: `${file.name}, ${formatSize(file.size)}`,
   };
 }

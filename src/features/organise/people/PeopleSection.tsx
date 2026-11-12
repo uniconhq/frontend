@@ -24,26 +24,43 @@ import {
   sectionOf,
   taskSectionPath,
 } from '@/lib/sections';
-import { ROLE_LABEL, ROLE_AREAS, roleMeans, type RolePlace } from '../roles';
+import { ROLE_LABEL, roleAbilities, type RolePlace } from '../roles';
 import { usePeopleMay } from '../may';
 import { InvitesSection } from '../invites/InvitesSection';
 import { holdersQuery, useHolders, useRoleChanges } from './holders';
 import tableClasses from '@/ui/table.module.css';
 import classes from './people.module.css';
 
-/**
- * The roles the caller may give, as Invite offers them, each with what it
- * lets its holder do: the admin role only where the server says so.
- */
-function roleOptions(giveAdmin: boolean, kind: RolePlace['kind']) {
+/** The roles the caller may give: the admin role only where the server says so. */
+function roleOptions(giveAdmin: boolean) {
   const roles: RoleName[] = giveAdmin
     ? ['admin', 'manager', 'observer']
     : ['manager', 'observer'];
-  return roles.map((role) => ({
-    value: role,
-    label: ROLE_LABEL[role],
-    description: roleMeans(role, kind).join(' '),
-  }));
+  return roles.map((role) => ({ value: role, label: ROLE_LABEL[role] }));
+}
+
+/** Each role's abilities, highest first, each saying it includes the one below. */
+function RoleAbilities({ kind }: { kind: RolePlace['kind'] }) {
+  return (
+    <div className={classes.roles} role="group" aria-label="What each role can do">
+      {(['admin', 'manager', 'observer'] as const).map((role) => {
+        const { below, adds } = roleAbilities(role, kind);
+        return (
+          <section key={role} aria-label={ROLE_LABEL[role]}>
+            <h3 className={classes.role}>{ROLE_LABEL[role]}</h3>
+            <ul className={classes.abilities}>
+              {below !== null && (
+                <li>Everything a {ROLE_LABEL[below].toLowerCase()} can do, and:</li>
+              )}
+              {adds.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </div>
+  );
 }
 
 /** The broader scope a role was given at, which reaches the place it is listed at. */
@@ -145,20 +162,12 @@ function HolderRow({
         </Stack>
       </th>
       <td>{ROLE_LABEL[holder.role]}</td>
-      <td>
-        {inherited ? (
-          <Stack gap={2}>
-            <span>{givenAt(holder.at_names)}</span>
-            {manages && (
-              <PageLink to={organisersOf(holder.at_names)}>Change it there</PageLink>
-            )}
-          </Stack>
-        ) : (
-          `This ${place.kind}`
-        )}
-      </td>
+      <td>{inherited ? givenAt(holder.at_names) : `This ${place.kind}`}</td>
       {manages && (
         <td>
+          {inherited && (
+            <PageLink to={organisersOf(holder.at_names)}>Change it there</PageLink>
+          )}
           {changeable && (
             <Group gap={6} align="stretch">
               <Button
@@ -188,7 +197,7 @@ function HolderRow({
               <RadioGroup
                 label="Role"
                 value={role}
-                options={roleOptions(giveAdmin, place.kind)}
+                options={roleOptions(giveAdmin)}
                 onChange={(value) => setRole(value as RoleName)}
               />
               <Group gap={6} align="stretch">
@@ -287,30 +296,7 @@ export function PeopleSection({ place }: { place: RolePlace }) {
       <Card>
         <Stack gap="sm">
           <SectionTitle>What each role can do</SectionTitle>
-          <div className={tableClasses.scroll}>
-            <table className={tableClasses.table} aria-label="What each role can do">
-              <thead>
-                <tr>
-                  <th scope="col">Role</th>
-                  {ROLE_AREAS.map((area) => (
-                    <th scope="col" key={area}>
-                      {area}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(['admin', 'manager', 'observer'] as const).map((role) => (
-                  <tr key={role}>
-                    <th scope="row">{ROLE_LABEL[role]}</th>
-                    {roleMeans(role, place.kind).map((line) => (
-                      <td key={line}>{line}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <RoleAbilities kind={place.kind} />
         </Stack>
       </Card>
       <Card>

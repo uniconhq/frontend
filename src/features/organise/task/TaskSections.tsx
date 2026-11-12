@@ -17,6 +17,8 @@ import { taskPath } from '@/lib/organiser-paths';
 import { savedBy } from './published';
 import { STORED } from '../contest/places';
 import { TitleForm } from './TitleForm';
+import { ResultsControls } from './ResultsControls';
+import { TaskInContest } from '../contest/TaskEntry';
 import { PeopleSection } from '../people/PeopleSection';
 import { usePlaceMay } from '../may';
 import { SectionPage } from '../SectionPage';
@@ -31,8 +33,9 @@ function useTaskPlace() {
 }
 
 /**
- * The task's title, the one setting not on its page. Its workflow, inputs,
- * runs, scoring and checks are set on the task's own page.
+ * The task's title, its timeline in the contest and whether its results are
+ * released. Its workflow, inputs, runs, scoring and checks are set on the
+ * task's own page.
  */
 export function TaskSettingsPage() {
   const { place, may } = useTaskPlace();
@@ -51,6 +54,18 @@ export function TaskSettingsPage() {
     >
       <Card>
         <TitleForm place={place} />
+      </Card>
+      <Card>
+        <div className={classes.stack}>
+          <SectionTitle>Timeline</SectionTitle>
+          <TaskInContest org={org} contest={contest} task={task} />
+        </div>
+      </Card>
+      <Card>
+        <div className={classes.stack}>
+          <SectionTitle>Results</SectionTitle>
+          <ResultsControls path={{ org, contest, task }} manager={may.manage} />
+        </div>
       </Card>
       <section aria-label="The settings as stored" id={STORED}>
         <Card>

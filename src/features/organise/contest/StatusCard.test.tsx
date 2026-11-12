@@ -41,7 +41,7 @@ async function status(): Promise<HTMLElement> {
 }
 
 describe("the contest's status", () => {
-  it('says who sees a draft, and lists what opening it needs, leaving its state to the badge', async () => {
+  it('lists what opening a draft needs, leaving its state to the badge', async () => {
     server.use(
       signedIn,
       ...repoFiles,
@@ -51,11 +51,8 @@ describe("the contest's status", () => {
     renderApp(CONTEST);
 
     const card = await status();
-    await waitFor(() =>
-      expect(card).toHaveTextContent('Who sees it: Anyone signed in'),
-    );
-    expect(within(card).queryByText('Draft')).toBeNull();
     const list = await within(card).findByRole('list', { name: 'Before it opens' });
+    expect(within(card).queryByText('Draft')).toBeNull();
     expect(
       within(list)
         .getAllByRole('listitem')
@@ -215,7 +212,6 @@ describe("the contest's status", () => {
 
     const card = await status();
     const back = await within(card).findByRole('button', { name: 'Back to draft' });
-    expect(card).toHaveTextContent('Who sees it: Anyone signed in');
     expect(card).not.toHaveTextContent(/Live|starts|no longer/);
     await user.click(back);
     const dialog = await screen.findByRole('dialog', {
@@ -299,31 +295,6 @@ describe("the contest's status", () => {
     expect(sent[0]?.values['state']).toBe('archived');
   });
 
-  it('changes who sees it in words', async () => {
-    server.use(
-      signedIn,
-      ...repoFiles,
-      http.get(`${CONTEST_API}/organise/tasks`, () => HttpResponse.json(ready)),
-    );
-    const sent = settingsAt(DRAFT);
-    const user = userEvent.setup();
-    renderApp(CONTEST);
-
-    const card = await status();
-    await waitFor(() =>
-      expect(card).toHaveTextContent('Who sees it: Anyone signed in'),
-    );
-    await user.click(within(card).getByRole('button', { name: 'Change who sees it' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Who sees it' });
-    await user.click(
-      within(dialog).getByRole('radio', { name: 'Only its entrants and organisers' }),
-    );
-    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
-
-    await waitFor(() => expect(sent).toHaveLength(1));
-    expect(sent[0]?.values['visibility']).toBe('hidden');
-  });
-
   it('makes a change once more on the settings someone else saved first', async () => {
     server.use(
       signedIn,
@@ -337,19 +308,16 @@ describe("the contest's status", () => {
     renderApp(CONTEST);
 
     const card = await status();
-    await user.click(
-      await within(card).findByRole('button', { name: 'Change who sees it' }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: 'Who sees it' });
-    await user.click(
-      within(dialog).getByRole('radio', { name: 'Only its entrants and organisers' }),
-    );
-    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    const open = await within(card).findByRole('button', { name: 'Open the contest' });
+    await waitFor(() => expect(open).toBeEnabled());
+    await user.click(open);
+    const dialog = await screen.findByRole('dialog', { name: 'Open the contest?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Open the contest' }));
 
     await waitFor(() => expect(backend.sent).toHaveLength(2));
     expect(backend.sent[1]).toMatchObject({
       token: 'token-2',
-      values: { ...theirs, visibility: 'hidden' },
+      values: { ...theirs, state: 'published' },
     });
     expect(within(card).queryByRole('alert')).toBeNull();
   });
@@ -366,8 +334,5 @@ describe("the contest's status", () => {
     const card = await status();
     expect(await within(card).findByText('Read only')).toBeVisible();
     expect(within(card).queryByRole('button', { name: 'Open the contest' })).toBeNull();
-    expect(
-      within(card).queryByRole('button', { name: 'Change who sees it' }),
-    ).toBeNull();
   });
 });

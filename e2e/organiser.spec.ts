@@ -227,30 +227,42 @@ async function stubOrganiserApi(page: Page) {
       return json(route, []);
     }
     if (path === `${task}/show-preview`) {
-      // What the show lists always, as placeholders: each value, and the
-      // first run of each run entry with the fields it names.
+      // A made-up graded submission: the first run of each run entry the
+      // show lists always, accepted.
       const body = request.postDataJSON() as {
-        show: {
-          always?: { values?: string[]; runs?: { of: string; fields: string[] }[] };
-        };
+        show: { always?: { runs?: { of: string }[] } };
         moment: Schemas['ShowPreview']['moment'];
       };
-      const always = body.show.always ?? {};
       return json(route, {
         hidden: 0,
         moment: body.moment,
-        placeholders: {
-          values: always.values ?? [],
-          outputs: [],
+        sample: [{ verdict: 'accepted', passed: '1' }],
+        result: {
+          id: '00000000-0000-0000-0000-000000000000',
+          attempt: 1,
+          status: 'graded',
+          reason: null,
+          limit: null,
+          compiled: 1,
+          once: { reports: {}, texts: {} },
           inputs: {},
-          runs: (always.runs ?? []).map((entry) => ({
+          reveal_at: null,
+          run_values: [],
+          runs: (body.show.always?.runs ?? []).map((entry) => ({
             group: entry.of,
             place: 1,
+            id: null,
+            dropped: false,
             tuples: [{ title: 'Sample 1', key: {} }],
-            fields: entry.fields,
+            verdict: 'accepted',
+            passed: null,
+            reports: [],
+            texts: {},
+            label: null,
+            labelled: null,
+            message: null,
           })),
         },
-        result: null,
       } satisfies Schemas['ShowPreview']);
     }
     if (path === `${contest}/gradings/queue`) {
@@ -307,6 +319,7 @@ async function stubOrganiserApi(page: Page) {
         graded: false,
         yanked: null,
         text_values: null,
+        limits: { max: 50, count: 1, per: 30 },
       } satisfies Schemas['WorkflowForm']);
     }
     const spring: Schemas['ListedContest'] = {
@@ -576,8 +589,10 @@ test('an organiser opens a contest from its checklist', async ({ page }) => {
   state.orgMade = true;
   await page.goto('/orgs/acme/contests/spring');
 
+  await expect(page.getByLabel('The settings')).toContainText(
+    'Who sees itAnyone signed in',
+  );
   const status = page.getByRole('region', { name: 'Status' });
-  await expect(status).toContainText('Who sees it:');
   const checklist = status.getByRole('list', { name: 'Before it opens' });
   await expect(checklist).toContainText('A · Sum: published');
   await status.getByRole('button', { name: 'Open the contest' }).click();
@@ -662,7 +677,7 @@ test('an organiser reads how many submissions a task takes', async ({ page }) =>
   );
   await expect(
     submissions.getByRole('textbox', { name: 'Most submissions' }),
-  ).toHaveAttribute('placeholder', 'Default');
+  ).toHaveAttribute('placeholder', '50');
 });
 
 test('an organiser ticks the named runs of a group and keeps its shown runs on rename', async ({
@@ -707,7 +722,7 @@ scoring:
   ).toBeChecked();
   const preview = page.getByRole('region', { name: "An entrant's page", exact: true });
   await expect(preview.getByRole('region', { name: 'Group tests' })).toContainText(
-    'verdict appears here',
+    'ACCEPTED',
   );
   // At a phone's width the grid and the preview keep within the page.
   await page.setViewportSize({ width: 375, height: 800 });
@@ -769,7 +784,7 @@ test('the Runs card pairs files, lines up its cells, and gives a cell to the ent
   state.orgMade = true;
   state.taskYaml += 'repeat:\n  - inputs: [input, answer]\n    tuples: []\n';
   await page.route(
-    '**/api/v1/orgs/acme/contests/spring/tasks/sum/files/runs*',
+    /\/api\/v1\/orgs\/acme\/contests\/spring\/tasks\/sum\/files\/1\.(in|ans)$/,
     (route) =>
       route.fulfill({
         status: 404,
@@ -795,6 +810,7 @@ test('the Runs card pairs files, lines up its cells, and gives a cell to the ent
           graded: false,
           yanked: null,
           text_values: [],
+          limits: { max: 50, count: 1, per: 30 },
           inputs: ['input', 'answer'].map((id) => ({
             id,
             type: 'file',
@@ -819,7 +835,7 @@ test('the Runs card pairs files, lines up its cells, and gives a cell to the ent
   );
   await page.goto('/orgs/acme/contests/spring/tasks/sum');
   const runs = page.getByRole('region', { name: 'Runs', exact: true });
-  await runs.getByLabel('Add files', { exact: true }).setInputFiles([
+  await runs.getByLabel('Batch add', { exact: true }).setInputFiles([
     { name: '1.in', mimeType: 'text/plain', buffer: Buffer.from('1') },
     { name: '1.ans', mimeType: 'text/plain', buffer: Buffer.from('2') },
   ]);
@@ -920,6 +936,7 @@ test('long run paths and report titles stay within the page and their Result row
           graded: false,
           yanked: null,
           text_values: [],
+          limits: { max: 50, count: 1, per: 30 },
           inputs: [
             {
               id: 'input',
@@ -954,9 +971,7 @@ test('long run paths and report titles stay within the page and their Result row
   );
   await page.setViewportSize({ width: 760, height: 1000 });
   await page.goto('/orgs/acme/contests/spring/tasks/sum');
-  await expect(
-    page.getByRole('table', { name: 'What one submission gives' }),
-  ).toBeVisible();
+  await expect(page.getByRole('table', { name: 'A sample result' })).toBeVisible();
   expect(
     await page
       .locator('html')
@@ -1052,8 +1067,6 @@ scoring:
   await expect(line).toHaveText('sum()1');
   await line.fill('');
   await expect(card.getByText('empty', { exact: true })).toBeVisible();
-  await card.getByRole('button', { name: 'Total score sum(all.score)' }).click();
-  await expect(line).toHaveText('sum(all.score)');
   await page.setViewportSize({ width: 1440, height: 420 });
   const min = card.getByRole('button', {
     name: 'min(…) numbers → one number',

@@ -184,8 +184,20 @@ const nothingPreviewed = http.post(
     return HttpResponse.json({
       hidden: 0,
       moment,
-      placeholders: { values: [], outputs: [], inputs: {}, runs: [] },
-      result: null,
+      result: {
+        id: '00000000-0000-0000-0000-000000000000',
+        attempt: 1,
+        status: 'graded',
+        compiled: 1,
+        limit: null,
+        reason: null,
+        reveal_at: null,
+        inputs: {},
+        once: { reports: {}, texts: {} },
+        runs: [],
+        run_values: [],
+      },
+      sample: [],
     });
   },
 );
@@ -304,6 +316,7 @@ const emptyOrganising = [
       graded: false,
       yanked: null,
       text_values: [],
+      limits: { max: 50, count: 1, per: 30 },
     } satisfies components['schemas']['WorkflowForm']),
   ),
 ];

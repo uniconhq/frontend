@@ -51,7 +51,7 @@ describe('what a save of the task’s cards changes', () => {
     expect(changeLines(task(), now, TITLES)).toEqual([
       'Runs',
       'Scoring',
-      'Submission rules',
+      'Submissions',
     ]);
   });
 });

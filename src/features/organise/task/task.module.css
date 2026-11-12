@@ -1,30 +1,3 @@
-/* The readiness row: each part of the task ticked, or what it is missing. */
-.ready {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  font-size: 13px;
-}
-
-.ready li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.tick {
-  color: var(--unicon-text-primary);
-  font-weight: 700;
-}
-
-.missing {
-  color: var(--unicon-text-danger);
-  font-weight: 700;
-}
-
 .card {
   border: 1px solid var(--unicon-border);
   border-radius: var(--mantine-radius-md);
@@ -187,7 +160,6 @@
 .groupFrame {
   overflow: auto;
   max-height: 520px;
-  border: 1px solid var(--unicon-border);
 }
 .groupGrid {
   border-collapse: separate;
@@ -291,7 +263,8 @@
   width: 14rem;
 }
 .runMenu {
-  width: 2rem;
+  /* The ✕ button and the cell’s padding. */
+  width: 2.5rem;
 }
 .runCell {
   display: flex;
@@ -336,12 +309,6 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: 8px;
-}
-.secondTable {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-top: 16px;
 }
 
 /* What entrants see: a row for each part, a switch for each moment. The
@@ -406,13 +373,23 @@
   overflow-wrap: anywhere;
 }
 
-.previewProblems,
-.previewSlots {
+.previewProblems {
   margin: 0;
   padding-left: var(--mantine-spacing-lg);
   font-size: 13px;
 }
 
-.previewSlots {
+/* The task's status box and its facts, under its title. */
+.standing {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* The facts a value can read, each by its key. */
+.facts {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
   color: var(--unicon-text-secondary);
 }

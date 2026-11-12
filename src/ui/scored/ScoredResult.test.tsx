@@ -43,10 +43,16 @@ describe('a run’s values', () => {
     );
 
     const group = screen.getByRole('region', { name: 'Group main' });
-    expect(within(group).getByText(/Run time/)).toHaveTextContent('Run time (ms) 28');
-    expect(within(group).getByText(/Memory used/)).toHaveTextContent(
-      `Memory used (KB) ${formatExact('10420')}`,
-    );
+    expect(
+      within(group).getByRole('columnheader', { name: 'Run time (ms)' }),
+    ).toBeVisible();
+    expect(within(group).getByRole('cell', { name: '28' })).toBeVisible();
+    expect(
+      within(group).getByRole('columnheader', { name: 'Memory used (KB)' }),
+    ).toBeVisible();
+    expect(
+      within(group).getByRole('cell', { name: formatExact('10420') }),
+    ).toBeVisible();
     expect(screen.getByLabelText('Once')).toHaveTextContent('time_ms3');
   });
 
@@ -256,8 +262,12 @@ describe('what an entry of show names', () => {
       />,
     );
     const group = screen.getByRole('region', { name: 'Group main' });
-    expect(group).toHaveTextContent('Test 1Small gridPassed');
-    expect(group).toHaveTextContent('Test 2Small gridNot passed');
+    expect(within(group).getAllByRole('row')[1]).toHaveTextContent(
+      'Test 1Small gridYes',
+    );
+    expect(within(group).getAllByRole('row')[2]).toHaveTextContent(
+      'Test 2Small gridNo',
+    );
     expect(group).not.toHaveTextContent(/accepted/i);
   });
 
@@ -289,7 +299,7 @@ describe('what an entry of show names', () => {
     expect(samples).toHaveTextContent('Test 1seed 2');
     expect(samples).not.toHaveTextContent(/passed/i);
     expect(samples).not.toHaveTextContent(/accepted/i);
-    const first = screen.getByRole('region', { name: 'Group First test not passed' });
+    const first = screen.getByRole('region', { name: 'Group First failed run' });
     expect(first).toHaveTextContent('Test 3 of big');
     expect(first).toHaveTextContent(/wrong/i);
     expect(screen.queryByLabelText('Inputs')).toBeNull();

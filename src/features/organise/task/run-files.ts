@@ -39,7 +39,7 @@ export function pairRunFiles(
   const problems: string[] = [];
   const assigned = new Set<string>();
   for (const file of files) {
-    const path = file.webkitRelativePath || file.name;
+    const path = file.name;
     const { stem, ending } = stemOf(path);
     const matches =
       columns.length === 1
@@ -86,32 +86,4 @@ export function pairRunFiles(
     pairs.push({ file, row, input });
   }
   return { axis: next, pairs, problems };
-}
-
-/** A replacement keeps its own path; a new cell never takes another cell’s path. */
-export function cellPath(
-  axes: AxisValues[],
-  table: number,
-  row: number,
-  input: string,
-): string {
-  const current = axes[table]?.tuples[row]?.cells[input]?.value ?? '';
-  const others = new Set(
-    axes.flatMap((axis, index) =>
-      axis.tuples.flatMap((tuple, at) =>
-        Object.entries(tuple.cells)
-          .filter(([id]) => index !== table || at !== row || id !== input)
-          .map(([, cell]) => cell.value),
-      ),
-    ),
-  );
-  if (current.startsWith('runs/') && !others.has(current)) return current;
-  const base = `runs/${String(table)}/${String(row)}/${input}`;
-  let path = base;
-  let suffix = 2;
-  while (others.has(path)) {
-    path = `${base}_${String(suffix)}`;
-    suffix += 1;
-  }
-  return path;
 }

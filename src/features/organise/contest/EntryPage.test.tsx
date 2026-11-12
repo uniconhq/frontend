@@ -48,35 +48,17 @@ describe('how people enter', { timeout: 20_000 }, () => {
     const user = userEvent.setup();
     const form = await openForm();
 
-    expect(
-      within(form).getByRole('status', { name: 'What it adds up to' }),
-    ).toHaveTextContent(
-      'Anyone with an account can register from when the contest opens until the contest ends. An organiser approves each one.',
-    );
-    await user.click(
-      within(form).getByRole('button', { name: 'Students at a domain' }),
-    );
-    const students = way(form, 'Sign-up: Students');
-    expect(
-      students.getByRole('radio', { name: 'Approved straight away' }),
-    ).toBeChecked();
-    fireEvent.change(students.getByLabelText('Email domains'), {
+    await user.click(within(form).getByRole('button', { name: 'Email domain' }));
+    fireEvent.change(way(form, 'Sign-up').getByLabelText('Email domains'), {
       target: { value: 'u.nus.edu' },
     });
-    expect(
-      within(form).getByRole('status', { name: 'What it adds up to' }),
-    ).toHaveTextContent(
-      'Anyone with an @u.nus.edu email can register from when the contest opens until the contest ends. Each is approved straight away.',
-    );
     await user.click(
       within(form).getByRole('button', { name: 'Save how people enter' }),
     );
 
     expect(await screen.findByText('Saved.')).toBeVisible();
     expect(registrationOf(sent[0])).toEqual({
-      ways: [
-        { signup: { name: 'Students', domains: ['u.nus.edu'], approval: 'auto' } },
-      ],
+      ways: [{ signup: { domains: ['u.nus.edu'] } }],
     });
   });
 
@@ -103,11 +85,6 @@ describe('how people enter', { timeout: 20_000 }, () => {
     });
     const form = await openForm();
 
-    expect(
-      within(form).getByRole('status', { name: 'What it adds up to' }),
-    ).toHaveTextContent(
-      'Anyone you invite, or anyone with the code can register from when the contest opens until the contest ends. Some are approved straight away and others by an organiser, as each way says. At most 200 entrants can register.',
-    );
     const invited = way(form, 'People you invite');
     expect(await invited.findByRole('table', { name: 'Invites' })).toHaveTextContent(
       'cal',
@@ -230,7 +207,7 @@ describe('how people enter', { timeout: 20_000 }, () => {
     expect(within(form).getByLabelText(/^Closes at/)).toHaveValue(
       localOf('2026-06-01T09:00:00Z'),
     );
-    fireEvent.change(within(form).getByLabelText('Most entrants'), {
+    fireEvent.change(within(form).getByLabelText('Max number of entrants'), {
       target: { value: '300' },
     });
     await user.click(
@@ -251,7 +228,7 @@ describe('how people enter', { timeout: 20_000 }, () => {
     const form = await openForm();
 
     expect(within(form).getByRole('note')).toHaveTextContent(
-      'Only its entrants and organisers see this contest, so nobody can find it to sign up',
+      'Only entrants and organisers can see this contest, so nobody can find it to sign up.',
     );
   });
 

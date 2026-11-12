@@ -78,9 +78,8 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
         .getAllByRole('group')
         .filter((group) => group.tagName === 'FIELDSET')
         .map((group) => group.querySelector('legend')?.textContent),
-    ).toEqual(['Basics', 'Schedule', 'Teams']);
+    ).toEqual(['Basics', 'Who sees it', 'Schedule', 'Teams']);
     expect(within(form).queryByLabelText('State')).toBeNull();
-    expect(within(form).queryByLabelText('Who sees it')).toBeNull();
     expect(screen.getByRole('link', { name: 'View file' })).toHaveAttribute(
       'href',
       '/orgs/acme/contests/spring/settings#file',

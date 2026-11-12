@@ -120,16 +120,13 @@ describe("the contest's settings at a glance", () => {
       within(summary)
         .getAllByRole('term')
         .map((term) => term.textContent),
-    ).toEqual(['Schedule', 'How people enter', 'Teams']);
+    ).toEqual(['Schedule', 'How people enter', 'Teams', 'Who sees it']);
     expect(values).toEqual([
       `${at('2026-10-01T09:00:00Z')} to ${at('2026-10-01T14:00:00Z')}`,
       'Anyone you invite, or anyone with an @u.nus.edu email can register from when the contest opens until the contest ends. Each is approved straight away. At most 500 entrants can register.',
       'Teams of 2 to 3 people, fixed when the contest starts',
+      'Anyone, signed in or not',
     ]);
-    const status = screen.getByRole('region', { name: 'Status' });
-    expect(
-      await within(status).findByText('Who sees it: Anyone, signed in or not'),
-    ).toBeVisible();
     expect(screen.getAllByText(/Who sees it/)).toHaveLength(1);
     const card = screen.getByRole('region', { name: 'Settings' });
     expect(within(card).getByRole('link', { name: 'Settings' })).toHaveAttribute(

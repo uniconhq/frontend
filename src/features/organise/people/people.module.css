@@ -5,3 +5,24 @@
   margin-top: 8px;
   max-width: 480px;
 }
+
+/* Each role's abilities, side by side where there is room. */
+.roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 16px 24px;
+}
+
+.role {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.abilities {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--unicon-text-body);
+}

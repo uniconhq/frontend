@@ -12,30 +12,12 @@ import { FieldBox } from '../contest/ContestFile';
 import { typeWords } from '../workflows/words';
 import { NumberField } from '../forms/fields';
 import type { Give, InputValues } from '../forms/task-values';
+import { choices, chosenOf, offeredOf, YES_NO } from './input-choices';
 import { BuildCard, CardPart } from './BuildCard';
 import { inputTitle, type TaskPlace } from './build-data';
 import { FileSetting } from './FileSetting';
 import type { StagedInput } from './input-files';
 import classes from './task.module.css';
-
-/** A choice of `options`, keeping a value the file has that is not one of them. */
-function choices(options: string[], value: string) {
-  const all = value === '' || options.includes(value) ? options : [value, ...options];
-  return all.map((option) => ({ value: option, label: option }));
-}
-
-const YES_NO = [
-  { value: 'true', label: 'Yes' },
-  { value: 'false', label: 'No' },
-];
-
-/** Each option chosen, in the order the workflow declares them. */
-function chosenOf(text: string): string[] {
-  return text
-    .split(',')
-    .map((option) => option.trim())
-    .filter((option) => option !== '');
-}
 
 type Change = (change: Partial<InputValues>) => void;
 
@@ -167,9 +149,8 @@ function ValueField({
 
 /**
  * What entrants see of an input they give, as its type takes it: the label
- * shown to them, and for a choice the options they may pick from and the one
- * picked to start with; a starting value for text, yes or no, or a number,
- * with a number's least and most; the most a file or folder may hold.
+ * shown to them, and for a choice the options they may pick from; a default
+ * for a choice, text, yes or no, or a number, with a number's least and most; the most a file or folder may hold.
  */
 function EntrantFields({
   declared,
@@ -185,8 +166,7 @@ function EntrantFields({
   const { type } = declared;
   const options = declared.options ?? [];
   const chosen = chosenOf(input.options);
-  const offered =
-    chosen.length === 0 ? options : options.filter((option) => chosen.includes(option));
+  const offered = offeredOf(declared, input);
   const strays = chosen.filter((option) => !options.includes(option));
   const toggle = (option: string, on: boolean) =>
     onChange({
@@ -207,7 +187,7 @@ function EntrantFields({
         />
         {type === 'text' && (
           <TextInput
-            label="Filled in to start with"
+            label="Default"
             value={input.default}
             onChange={(value) => onChange({ default: value })}
             disabled={disabled}
@@ -215,7 +195,7 @@ function EntrantFields({
         )}
         {(type === 'boolean' || type === 'enum') && (
           <Select
-            label="Chosen to start with"
+            label="Default"
             value={input.default}
             options={type === 'boolean' ? YES_NO : choices(offered, input.default)}
             placeholder="Nothing chosen"
@@ -226,7 +206,7 @@ function EntrantFields({
         {type === 'number' && (
           <>
             <NumberField
-              label="Filled in to start with"
+              label="Default"
               value={input.default}
               onChange={(value) => onChange({ default: value })}
               disabled={disabled}
@@ -293,21 +273,15 @@ function EntrantFields({
 function DeclaredItem({
   declared,
   input,
-  axisCount,
-  axis,
   onChange,
   onGive,
-  onAxis,
   files,
   disabled,
 }: {
   declared: DeclaredInput;
   input: InputValues;
-  axisCount: number;
-  axis: number;
   onChange: Change;
   onGive: (give: Give) => void;
-  onAxis: (axis: number) => void;
   files: InputFiles | undefined;
   disabled: boolean;
 }) {
@@ -340,20 +314,6 @@ function DeclaredItem({
             disabled={disabled}
           />
         </div>
-        {perRun && axisCount > 1 && (
-          <div className={classes.narrow}>
-            <Select
-              label="Table"
-              value={String(axis)}
-              options={Array.from({ length: axisCount }, (_, index) => ({
-                value: String(index),
-                label: `Table ${String(index + 1)}`,
-              }))}
-              onChange={(next) => onAxis(Number(next))}
-              disabled={disabled}
-            />
-          </div>
-        )}
         {perRun ? (
           <BodyText size="sm" tone="secondary">
             A column in Runs.
@@ -393,11 +353,8 @@ export function InputsCard({
   declared,
   workflowProblem,
   inputs,
-  axisCount = 1,
-  axisOf = () => 0,
   onChange,
   onGive = () => undefined,
-  onAxis = () => undefined,
   onRemove,
   files,
   disabled,
@@ -409,13 +366,8 @@ export function InputsCard({
   /** Why the workflow cannot be read, when it cannot. */
   workflowProblem: string | null;
   inputs: InputValues[];
-  /** How many axes the runs card has, so a per-run input can move. */
-  axisCount?: number;
-  /** Which axis a per-run input is a column of. */
-  axisOf?: (id: string) => number;
   onChange: (id: string, change: Partial<InputValues>) => void;
   onGive?: (id: string, give: Give) => void;
-  onAxis?: (id: string, axis: number) => void;
   onRemove: (id: string) => void;
   disabled: boolean;
 }) {
@@ -442,11 +394,8 @@ export function InputsCard({
         key={each.id}
         declared={each}
         input={input}
-        axisCount={axisCount}
-        axis={axisOf(each.id)}
         onChange={(change) => onChange(each.id, change)}
         onGive={(give) => onGive(each.id, give)}
-        onAxis={(axis) => onAxis(each.id, axis)}
         files={files}
         disabled={disabled}
       />

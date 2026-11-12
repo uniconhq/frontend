@@ -6,8 +6,6 @@ import type { TaskStanding } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ConfirmDialog } from '@/ui/ConfirmDialog';
-import { PageLink } from '@/ui/PageLink';
-import { RadioGroup } from '@/ui/RadioGroup';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { Group } from '@/ui/layout';
@@ -29,10 +27,10 @@ import { contestPlaceOf, useOpenedField } from './opened';
 import { useContestChange } from './save';
 import { useContestSettings } from './settings';
 import { labelOf, useTaskTitles } from './task-entry';
-import { VISIBILITY_CHOICES, visibilitySentence } from './words';
+import { visibilitySentence } from './words';
 import shared from '../organise.module.css';
 import type { ProblemPath } from '../problem-path';
-import classes from './contest.module.css';
+import { Checklist, StatusBox, type Check } from '../hub/Status';
 
 const STANDINGS = '/api/v1/orgs/{org}/contests/{contest}/organise/tasks';
 
@@ -54,15 +52,6 @@ function dated(values: ContestValues) {
     end: isoOf(values.end) ?? '',
   } as const;
 }
-
-type Check = {
-  key: string;
-  ok: boolean;
-  /** Only a warning: opening goes ahead without it. */
-  warning?: boolean;
-  text: string;
-  to: string;
-};
 
 /**
  * How a task stands for opening the contest: published without errors, with
@@ -161,15 +150,6 @@ function checksOf(
   ];
 }
 
-function Mark({ check }: { check: Check }) {
-  if (check.ok) return <span aria-label="Done">✓</span>;
-  return check.warning === true ? (
-    <span aria-label="Worth doing">!</span>
-  ) : (
-    <span aria-label="To do">✗</span>
-  );
-}
-
 /** What opening the contest will do, said before it is done. */
 function openingSentences(values: ContestValues, now: Date): string[] {
   const ways = values.ways ?? DEFAULT_WAYS;
@@ -186,10 +166,10 @@ function openingSentences(values: ContestValues, now: Date): string[] {
   return [visibilitySentence(values.visibility), registration, starts];
 }
 
-type Ask = 'open' | 'draft' | 'archive' | 'visibility' | null;
+type Ask = 'open' | 'draft' | 'archive' | null;
 
 /**
- * A refusal about this card's own settings, where it stands and who sees it
+ * A refusal about this card's own setting, where it stands
  * (#438: a contest that has started never goes back to draft), as its
  * sentences alone, here where the button was; null for any other refusal,
  * which says where each problem is.
@@ -197,8 +177,7 @@ type Ask = 'open' | 'draft' | 'archive' | 'visibility' | null;
 function ownRefusals(error: ApiError) {
   const errors = definitionErrorsOf(error);
   if (errors.length === 0) return null;
-  const own = (path: ProblemPath) =>
-    path.length === 1 && (path[0] === 'state' || path[0] === 'visibility');
+  const own = (path: ProblemPath) => path.length === 1 && path[0] === 'state';
   if (!errors.every((each) => own(each.path))) return null;
   return (
     <>
@@ -210,8 +189,8 @@ function ownRefusals(error: ApiError) {
 }
 
 /**
- * Who sees the contest, what opening it needs while it is a draft, and an
- * admin's buttons. Its state is the page header's badge. Going back to draft
+ * What opening the contest needs while it is a draft, and an admin's
+ * buttons. Its state is the page header's badge. Going back to draft
  * after the start is the forge's to refuse, so the button stays while live.
  */
 export function StatusCard({ org, contest }: { org: string; contest: string }) {
@@ -233,7 +212,6 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
   const { apply, write, pending } = useContestChange(org, contest);
   const [asking, setAsking] = useState<Ask>(null);
   const [refused, setRefused] = useState<Outcome<SettingsBody> | null>(null);
-  const [visibility, setVisibility] = useState('');
   const { field } = useOpenedField(settings.state === 'ready');
 
   const run = async (change: Parameters<typeof apply>[0]) => {
@@ -244,11 +222,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
   };
 
   return (
-    <section
-      className={classes.status}
-      aria-label="Status"
-      data-field={field === 'state' ? 'state' : undefined}
-    >
+    <StatusBox field={field === 'state' ? 'state' : undefined}>
       <Loaded view={settings} compact>
         {(values) => {
           if (values === null) {
@@ -296,40 +270,9 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
           return (
             <>
               <ReadOnlyAt place={{ kind: 'contest', org, contest }} allowed={admin} />
-              <Group gap="8px 12px">
-                <BodyText>
-                  Who sees it:{' '}
-                  {VISIBILITY_CHOICES.find((one) => one.value === values.visibility)
-                    ?.label ?? 'Not set'}
-                </BodyText>
-                {admin && (
-                  <FieldBox name="visibility">
-                    <Button
-                      size="xs"
-                      variant="secondary"
-                      label="Change who sees it"
-                      onClick={() => {
-                        setVisibility(values.visibility);
-                        setAsking('visibility');
-                      }}
-                    >
-                      Change
-                    </Button>
-                  </FieldBox>
-                )}
-              </Group>
               {standing === 'draft' && (
                 <Loaded view={tasks} compact>
-                  {() => (
-                    <ul className={classes.checklist} aria-label="Before it opens">
-                      {checks.map((check) => (
-                        <li key={check.key}>
-                          <Mark check={check} />
-                          <PageLink to={check.to}>{check.text}</PageLink>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  {() => <Checklist label="Before it opens" checks={checks} />}
                 </Loaded>
               )}
               {actions.length > 0 && <Group gap="xs">{actions}</Group>}
@@ -414,32 +357,10 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                   read. Its entrants and their results stay as they are.
                 </BodyText>
               </ConfirmDialog>
-              <ConfirmDialog
-                opened={asking === 'visibility'}
-                onClose={() => setAsking(null)}
-                title="Who sees it"
-                confirm="Save"
-                loading={pending}
-                disabled={visibility === values.visibility || visibility === ''}
-                onConfirm={() =>
-                  void run((fresh) => writeAt(fresh, ['visibility'], visibility))
-                }
-              >
-                <RadioGroup
-                  label="Who sees the contest"
-                  value={visibility}
-                  options={VISIBILITY_CHOICES}
-                  onChange={setVisibility}
-                />
-                <BodyText tone="secondary">
-                  Who may enter is set separately, under How people enter: a contest can
-                  be seen by anyone and still entered only by invite.
-                </BodyText>
-              </ConfirmDialog>
             </>
           );
         }}
       </Loaded>
-    </section>
+    </StatusBox>
   );
 }
